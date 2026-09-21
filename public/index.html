@@ -1,0 +1,3172 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Jayden的智能配置计算引擎 | Ni-Zn Battery Configuration Calculator</title>
+    <!-- ══ CDN 依赖：零构建，全部运行时引入 ══ -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>
+        /* Tailwind 主题色 → CSS 变量映射（颜色全部由主题变量驱动，随 [data-theme] 切换） */
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
+                    },
+                    colors: {
+                        base:   'rgb(var(--c-bg) / <alpha-value>)',
+                        base2:  'rgb(var(--c-bg2) / <alpha-value>)',
+                        panel:  'rgb(var(--c-panel) / <alpha-value>)',
+                        elev:   'rgb(var(--c-elevated) / <alpha-value>)',
+                        line:   'rgb(var(--c-border) / <alpha-value>)',
+                        ink:    'rgb(var(--c-text) / <alpha-value>)',
+                        ink2:   'rgb(var(--c-text-2) / <alpha-value>)',
+                        ink3:   'rgb(var(--c-text-3) / <alpha-value>)',
+                        accent: 'rgb(var(--c-accent) / <alpha-value>)',
+                        accent2:'rgb(var(--c-accent2) / <alpha-value>)',
+                        onaccent: 'rgb(var(--c-accent-contrast) / <alpha-value>)',
+                        ok:     'rgb(var(--c-ok) / <alpha-value>)',
+                        warn:   'rgb(var(--c-warn) / <alpha-value>)',
+                        bad:    'rgb(var(--c-bad) / <alpha-value>)',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <!-- Markdown 渲染（AI 回复）与 XSS 消毒 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <!-- SheetJS：Excel/CSV 本地解析（服务端 /api/parse 优先，此处为回退） -->
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <!-- pdf.js：PDF 文本提取 / 扫描件转图片（回退通道） -->
+    <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <style>
+        /* ═══════════════════════════════════════════════════════════════
+           THEME SYSTEM — CSS 变量驱动（6 套主题）
+           变量值为 "R G B" 三元组，配合 rgb(var(--x) / alpha) 使用
+           ═══════════════════════════════════════════════════════════════ */
+        :root, [data-theme="dark"] {
+            --c-bg: 15 23 42;   --c-bg2: 2 6 23;
+            --c-panel: 30 41 59; --c-elevated: 51 65 85;
+            --c-border: 71 85 105;
+            --c-text: 241 245 249; --c-text-2: 203 213 225; --c-text-3: 148 163 184;
+            --c-accent: 96 165 250; --c-accent2: 129 140 248; --c-accent-contrast: 15 23 42;
+            --c-ok: 52 211 153; --c-warn: 251 191 36; --c-bad: 248 113 113;
+            --bg-gradient: linear-gradient(135deg, #0f172a 0%, #134e4a 25%, #0f172a 50%, #1e1b4b 75%, #0f172a 100%);
+            --glow1: rgba(16,185,129,0.08); --glow2: rgba(99,102,241,0.08); --glow3: rgba(6,182,212,0.05);
+            --shadow-card: 0 10px 30px rgba(0,0,0,0.35);
+            --ai-w: 420px;
+        }
+        /* hero 渐变为全主题统一深色阶（保证白色文字对比度 ≥4.5:1） */
+        :root, [data-theme="light"], [data-theme="mint"], [data-theme="sky"], [data-theme="sand"], [data-theme="sakura"] {
+            --c-hero-ok1: 4 120 87;   --c-hero-ok2: 17 94 89;
+            --c-hero-info1: 29 78 216; --c-hero-info2: 55 48 163;
+            --c-hero-neutral1: 71 85 105; --c-hero-neutral2: 30 41 59;
+        }
+        [data-theme="light"] {
+            --c-bg: 241 245 249; --c-bg2: 226 232 240;
+            --c-panel: 255 255 255; --c-elevated: 248 250 252;
+            --c-border: 203 213 225;
+            --c-text: 15 23 42; --c-text-2: 51 65 85; --c-text-3: 71 85 105;
+            --c-accent: 37 99 235; --c-accent2: 79 70 229; --c-accent-contrast: 255 255 255;
+            --c-ok: 5 150 105; --c-warn: 180 83 9; --c-bad: 220 38 38;
+            --bg-gradient: linear-gradient(135deg, #eef2f7 0%, #e4f2ee 25%, #f7f9fc 50%, #ebeafa 75%, #eef2f7 100%);
+            --glow1: rgba(16,185,129,0.10); --glow2: rgba(99,102,241,0.10); --glow3: rgba(6,182,212,0.06);
+            --shadow-card: 0 10px 30px rgba(15,23,42,0.10);
+        }
+        [data-theme="mint"] {
+            --c-bg: 236 253 245; --c-bg2: 209 250 229;
+            --c-panel: 255 255 255; --c-elevated: 240 253 250;
+            --c-border: 134 203 182;
+            --c-text: 4 47 46; --c-text-2: 15 78 62; --c-text-3: 6 95 70;
+            --c-accent: 15 118 110; --c-accent2: 5 150 105; --c-accent-contrast: 255 255 255;
+            --c-ok: 4 120 87; --c-warn: 180 83 9; --c-bad: 190 18 60;
+            --bg-gradient: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 25%, #f0fdfa 50%, #ccfbf1 75%, #ecfdf5 100%);
+            --glow1: rgba(13,148,136,0.10); --glow2: rgba(16,185,129,0.08); --glow3: rgba(20,184,166,0.07);
+            --shadow-card: 0 10px 30px rgba(6,95,70,0.10);
+        }
+        [data-theme="sky"] {
+            --c-bg: 240 249 255; --c-bg2: 224 242 254;
+            --c-panel: 255 255 255; --c-elevated: 239 246 255;
+            --c-border: 125 183 252;
+            --c-text: 8 47 73; --c-text-2: 12 74 110; --c-text-3: 3 105 161;
+            --c-accent: 3 105 161; --c-accent2: 79 70 229; --c-accent-contrast: 255 255 255;
+            --c-ok: 4 120 87; --c-warn: 180 83 9; --c-bad: 220 38 38;
+            --bg-gradient: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 25%, #eff6ff 50%, #dbeafe 75%, #f0f9ff 100%);
+            --glow1: rgba(2,132,199,0.08); --glow2: rgba(59,130,246,0.09); --glow3: rgba(14,165,233,0.06);
+            --shadow-card: 0 10px 30px rgba(3,105,161,0.10);
+        }
+        [data-theme="sand"] {
+            --c-bg: 250 245 235; --c-bg2: 245 236 220;
+            --c-panel: 255 253 248; --c-elevated: 248 242 230;
+            --c-border: 202 183 158;
+            --c-text: 55 41 25; --c-text-2: 87 68 48; --c-text-3: 113 92 68;
+            --c-accent: 194 65 12; --c-accent2: 154 52 18; --c-accent-contrast: 255 255 255;
+            --c-ok: 4 120 87; --c-warn: 146 64 14; --c-bad: 185 28 28;
+            --bg-gradient: linear-gradient(135deg, #faf5eb 0%, #f5ecdc 25%, #fdf9f0 50%, #f3e8d3 75%, #faf5eb 100%);
+            --glow1: rgba(194,65,12,0.06); --glow2: rgba(180,150,90,0.10); --glow3: rgba(217,119,6,0.05);
+            --shadow-card: 0 10px 30px rgba(87,68,48,0.12);
+        }
+        [data-theme="sakura"] {
+            --c-bg: 253 242 248; --c-bg2: 252 231 243;
+            --c-panel: 255 255 255; --c-elevated: 253 244 255;
+            --c-border: 244 178 214;
+            --c-text: 80 7 36; --c-text-2: 131 24 67; --c-text-3: 157 23 77;
+            --c-accent: 219 39 119; --c-accent2: 192 38 211; --c-accent-contrast: 255 255 255;
+            --c-ok: 4 120 87; --c-warn: 180 83 9; --c-bad: 190 18 60;
+            --bg-gradient: linear-gradient(135deg, #fdf2f8 0%, #fce7f3 25%, #fdf4ff 50%, #fbcfe8 75%, #fdf2f8 100%);
+            --glow1: rgba(219,39,119,0.06); --glow2: rgba(192,38,211,0.06); --glow3: rgba(244,114,182,0.07);
+            --shadow-card: 0 10px 30px rgba(131,24,67,0.10);
+        }
+
+        * { box-sizing: border-box; }
+        html { background: rgb(var(--c-bg)); }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            color: rgb(var(--c-text));
+        }
+        body, body::before { transition: background 0.35s ease; }
+        body::before {
+            content: '';
+            position: fixed;
+            inset: 0;
+            background:
+                radial-gradient(ellipse at 15% 25%, var(--glow1) 0%, transparent 50%),
+                radial-gradient(ellipse at 85% 75%, var(--glow2) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, var(--glow3) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* ── 表单控件 ─────────────────────────────────────────────── */
+        input[type="number"], select, textarea {
+            transition: all 0.2s ease;
+            outline: none;
+            color-scheme: dark;
+        }
+        [data-theme="light"] input, [data-theme="light"] select, [data-theme="light"] textarea,
+        [data-theme="mint"] input, [data-theme="mint"] select, [data-theme="mint"] textarea,
+        [data-theme="sky"] input, [data-theme="sky"] select, [data-theme="sky"] textarea,
+        [data-theme="sand"] input, [data-theme="sand"] select, [data-theme="sand"] textarea,
+        [data-theme="sakura"] input, [data-theme="sakura"] select, [data-theme="sakura"] textarea {
+            color-scheme: light;
+        }
+        input[type="number"]:focus, select:focus, textarea:focus {
+            border-color: rgb(var(--c-accent));
+            box-shadow: 0 0 0 3px rgb(var(--c-accent) / 0.25);
+        }
+        select option { background: rgb(var(--c-panel)); color: rgb(var(--c-text)); }
+        input::placeholder, textarea::placeholder { color: rgb(var(--c-text-3)); opacity: 1; }
+        input:disabled, select:disabled, textarea:disabled { opacity: 0.55; cursor: not-allowed; }
+        input[type="number"]::-webkit-inner-spin-button { opacity: 0.5; }
+
+        /* ── 组件类（统一视觉语言） ──────────────────────────────── */
+        .card {
+            background: rgb(var(--c-panel) / 0.82);
+            border: 1px solid rgb(var(--c-border) / 0.55);
+            border-radius: 0.75rem;
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-card);
+        }
+        .card-deep {
+            background: rgb(var(--c-elevated) / 0.85);
+            border: 1px solid rgb(var(--c-border) / 0.45);
+            border-radius: 0.75rem;
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-card);
+        }
+        .inp {
+            width: 100%;
+            border-radius: 0.5rem;
+            border: 1px solid rgb(var(--c-border) / 0.7);
+            background: rgb(var(--c-elevated) / 0.9);
+            color: rgb(var(--c-text));
+            padding: 0.6rem 0.75rem;
+            font-size: 0.875rem;
+            font-weight: 500;
+            box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+        }
+        .inp-sm {
+            border-radius: 0.375rem;
+            border: 1px solid rgb(var(--c-border) / 0.8);
+            background: rgb(var(--c-elevated) / 0.95);
+            color: rgb(var(--c-text));
+        }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; gap: 0.375rem;
+            border-radius: 0.5rem; font-weight: 700; cursor: pointer;
+            transition: all 0.2s ease; border: 1px solid transparent;
+        }
+        .btn:disabled { opacity: 0.55; cursor: not-allowed; }
+        .btn-ghost {
+            background: rgb(var(--c-panel) / 0.65);
+            border-color: rgb(var(--c-border) / 0.7);
+            color: rgb(var(--c-text-2));
+        }
+        .btn-ghost:hover { background: rgb(var(--c-elevated) / 0.95); color: rgb(var(--c-text)); }
+        .btn-accent { background: rgb(var(--c-accent)); color: rgb(var(--c-accent-contrast)); box-shadow: 0 4px 12px rgb(var(--c-accent) / 0.35); }
+        .btn-accent:hover { filter: brightness(1.08); }
+        .btn-ok { background: rgb(var(--c-ok)); color: rgb(var(--c-accent-contrast)); box-shadow: 0 4px 12px rgb(var(--c-ok) / 0.30); }
+        .btn-ok:hover { filter: brightness(1.08); }
+        .btn-bad { background: rgb(var(--c-bad)); color: #fff; }
+        .btn-bad:hover { filter: brightness(1.08); }
+
+        .lbl { display:block; font-size:11px; font-weight:600; letter-spacing:.08em; text-transform:uppercase; color: rgb(var(--c-text-3)); }
+        .hint { font-size:10px; color: rgb(var(--c-accent)); margin-top: 0.25rem; }
+        .badge { border-radius: 9999px; padding: 0.125rem 0.75rem; font-size: 11px; font-weight: 700; }
+        .badge-ok   { background: rgb(var(--c-ok) / 0.16);   color: rgb(var(--c-ok)); }
+        .badge-warn { background: rgb(var(--c-warn) / 0.16); color: rgb(var(--c-warn)); }
+        .badge-bad  { background: rgb(var(--c-bad) / 0.16);  color: rgb(var(--c-bad)); }
+        .badge-acc  { background: rgb(var(--c-accent) / 0.14); color: rgb(var(--c-accent)); }
+
+        /* hero 大数字卡片 */
+        .hero-card { border-radius: 0.75rem; border: 1px solid rgb(var(--c-border)/0.4); padding: 1rem; box-shadow: var(--shadow-card); }
+        .hero-card .hero-label { font-size: 10px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: rgb(255 255 255 / 0.95); }
+        .hero-card .hero-value { margin-top: .25rem; font-size: 2.25rem; line-height: 1.1; font-weight: 900; color: #fff; }
+        .hero-card .hero-unit  { font-size: 10px; color: rgb(255 255 255 / 0.9); }
+        .hero-ok      { background: linear-gradient(135deg, rgb(var(--c-hero-ok1)), rgb(var(--c-hero-ok2))); }
+        .hero-info    { background: linear-gradient(135deg, rgb(var(--c-hero-info1)), rgb(var(--c-hero-info2))); }
+        .hero-neutral { background: linear-gradient(135deg, rgb(var(--c-hero-neutral1)), rgb(var(--c-hero-neutral2))); }
+        /* 满足率 <100% 警示态：固定深色 rose 渐变（白字对比 ≥5:1） */
+        .hero-bad     { background: linear-gradient(135deg, #e11d48, #be123c); }
+
+        /* 数值 stat 卡片 */
+        .stat-card {
+            border-radius: 0.75rem; padding: 1rem;
+            border: 1px solid rgb(var(--c-border) / 0.45);
+            background: rgb(var(--c-elevated) / 0.75);
+            backdrop-filter: blur(10px);
+            box-shadow: var(--shadow-card);
+            transition: box-shadow .4s ease;
+        }
+        .stat-title { font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgb(var(--c-text-3)); }
+        .stat-value { font-size: 1.5rem; font-weight: 700; letter-spacing: -0.01em; color: rgb(var(--c-text)); }
+        .stat-unit  { font-size: 0.875rem; font-weight: 500; color: rgb(var(--c-text-3)); }
+        .stat-hint  { margin-top: .25rem; font-size: 11px; font-family: 'JetBrains Mono', monospace; color: rgb(var(--c-text-3)); }
+        /* AI 填入后高亮闪烁 */
+        .stat-card.flash { animation: cardFlash 1.6s ease 1; }
+        @keyframes cardFlash {
+            0% { box-shadow: 0 0 0 0 rgb(var(--c-accent) / 0.65); }
+            35% { box-shadow: 0 0 0 6px rgb(var(--c-accent) / 0.45); }
+            100% { box-shadow: var(--shadow-card); }
+        }
+
+        /* 功率需求 自动/手动 分段按钮 */
+        .pm-btn { color: rgb(var(--c-text-3)); border-radius: .25rem; transition: all .2s ease; }
+        .pm-btn:hover { color: rgb(var(--c-text)); }
+        .pm-btn.pm-active { background: rgb(var(--c-accent)); color: rgb(var(--c-accent-contrast)); }
+
+        /* 电压校验面板 */
+        .vpanel { border-radius: 0.75rem; border: 2px solid; padding: 1rem; backdrop-filter: blur(10px); transition: all .3s ease; box-shadow: var(--shadow-card); }
+        .vpanel-ok  { border-color: rgb(var(--c-ok) / 0.55);  background: rgb(var(--c-ok) / 0.10); }
+        .vpanel-bad { border-color: rgb(var(--c-bad) / 0.55); background: rgb(var(--c-bad) / 0.10); }
+
+        /* ── 滚动条 ───────────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 6px; height: 6px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgb(var(--c-border)); border-radius: 3px; }
+
+        /* ── 备电时间按钮 ─────────────────────────────────────────── */
+        .btn-time { transition: all 0.15s ease; border: 1px solid rgb(var(--c-border) / 0.7); background: rgb(var(--c-panel) / 0.6); color: rgb(var(--c-text-2)); }
+        .btn-time:hover { background: rgb(var(--c-elevated)); color: rgb(var(--c-accent)); }
+        .btn-time.active {
+            background: rgb(var(--c-accent));
+            color: rgb(var(--c-accent-contrast));
+            box-shadow: 0 4px 12px rgb(var(--c-accent) / 0.35);
+            border-color: transparent;
+        }
+
+        /* ── 高级参数折叠 ─────────────────────────────────────────── */
+        .advanced-content { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+        .advanced-content.open { max-height: 320px; }
+        .chevron-icon { transition: transform 0.3s ease; }
+        .chevron-icon.rotated { transform: rotate(180deg); }
+
+        /* ── Tooltip ─────────────────────────────────────────────── */
+        .recommend-wrap { position:relative; display:inline-flex; align-items:center; }
+        .recommend-wrap .tip {
+            display:none; position:absolute; top:calc(100% + 6px); left:0;
+            min-width:240px; max-width:300px; background: rgb(var(--c-elevated));
+            border:1px solid rgb(var(--c-border)); border-radius:8px;
+            padding:10px 12px; font-size:11px; line-height:1.6; color: rgb(var(--c-text-2));
+            box-shadow:0 8px 24px rgb(0 0 0 / 0.35); z-index:50; pointer-events:none;
+        }
+        .recommend-wrap:hover .tip { display:block; }
+
+        /* ── 模式 Tab ────────────────────────────────────────────── */
+        .mode-tab { cursor:pointer; user-select:none; transition: all 0.2s ease; border: 1px solid transparent; }
+        .mode-tab.active-power {
+            background: linear-gradient(135deg, rgb(var(--c-hero-info1)), rgb(var(--c-hero-info2)));
+            color:#fff; box-shadow:0 4px 14px rgb(var(--c-accent) / 0.35);
+        }
+        .mode-tab.active-capacity {
+            background: linear-gradient(135deg, rgb(var(--c-hero-ok1)), rgb(var(--c-hero-ok2)));
+            color:#fff; box-shadow:0 4px 14px rgb(var(--c-ok) / 0.35);
+        }
+        .mode-tab:not(.active-power):not(.active-capacity) {
+            background: rgb(var(--c-panel) / 0.5); color: rgb(var(--c-text-2));
+        }
+        .mode-tab:not(.active-power):not(.active-capacity):hover {
+            background: rgb(var(--c-elevated)); color: rgb(var(--c-text));
+        }
+        #modeRecommend { transition: all 0.25s ease; }
+        .cap-hide { display:none !important; }
+
+        /* ── 计算步骤盒 ──────────────────────────────────────────── */
+        .step-box { border-left:3px solid; padding:10px 14px; border-radius:0 8px 8px 0; margin-bottom:8px; }
+        .step-box.power-step { border-color: rgb(var(--c-accent)); background: rgb(var(--c-accent) / 0.10); }
+        .step-box.cap-step   { border-color: rgb(var(--c-ok));     background: rgb(var(--c-ok) / 0.10); }
+        .step-label { font-size:10px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; margin-bottom:4px; }
+        .step-box.power-step .step-label { color: rgb(var(--c-accent)); }
+        .step-box.cap-step   .step-label { color: rgb(var(--c-ok)); }
+        .step-formula { font-family:'JetBrains Mono',monospace; font-size:12.5px; color: rgb(var(--c-text-2)); line-height:1.7; }
+        .step-result { font-size:14px; font-weight:700; color: rgb(var(--c-text)); margin-top:5px; }
+        .step-result b { color: rgb(var(--c-text)); font-size:15px; }
+
+        /* ── 放电表 ──────────────────────────────────────────────── */
+        .discharge-table-container { overflow-x: auto; }
+        .discharge-table-container table { border-collapse: collapse; }
+        .discharge-table-container th, .discharge-table-container td { padding: 6px 8px; white-space: nowrap; }
+        .dt-th-head { background: rgb(var(--c-elevated)); color: rgb(var(--c-text-2)); }
+        .dt-row-label { background: rgb(var(--c-elevated)); color: rgb(var(--c-text-3)); }
+        .dt-row-label.matched { background: rgb(var(--c-accent) / 0.18); color: rgb(var(--c-accent)); }
+        .dt-cell { color: rgb(var(--c-text-2)); font-family:'JetBrains Mono',monospace; }
+        .dt-cell.hl { background: rgb(var(--c-warn) / 0.25); color: rgb(var(--c-text)); font-weight:700; box-shadow: inset 0 0 0 1px rgb(var(--c-warn) / 0.6); }
+        .dt-cell.row-match { background: rgb(var(--c-accent) / 0.10); color: rgb(var(--c-accent)); }
+
+        /* ── 已保存配置卡 ────────────────────────────────────────── */
+        .config-card {
+            cursor:pointer; border-radius:0.5rem; padding:0.75rem;
+            border:1px solid rgb(var(--c-border) / 0.7); background: rgb(var(--c-panel) / 0.6);
+            transition: all .2s ease; position: relative;
+        }
+        .config-card:hover { border-color: rgb(var(--c-ok) / 0.7); background: rgb(var(--c-panel) / 0.9); box-shadow: var(--shadow-card); }
+        .config-card .del-btn { position:absolute; right:.5rem; top:.5rem; width:1.5rem; height:1.5rem; display:flex; align-items:center; justify-content:center; border-radius:.375rem; color: rgb(var(--c-text-3)); opacity:0; transition:all .2s ease; }
+        .config-card:hover .del-btn { opacity:1; }
+        .config-card .del-btn:hover { background: rgb(var(--c-bad) / 0.15); color: rgb(var(--c-bad)); }
+
+        /* ═══════════════════════════════════════════════════════════
+           LAYOUT — 计算区 + AI 侧边栏（flex 自适应压缩）
+           ═══════════════════════════════════════════════════════════ */
+        #appShell { display:flex; width:100%; min-height:100vh; position:relative; z-index:10; }
+        #calcPane { flex:1 1 0%; min-width:0; }
+        .scroll-root { height:100vh; overflow-y:auto; padding:1rem; }
+        .scroll-root > .inner { max-width: 1720px; margin: 0 auto; }
+
+        #aiSidebar {
+            position:relative; flex:0 0 auto;
+            width: var(--ai-w); overflow:hidden;
+            border-left: 1px solid rgb(var(--c-border) / 0.6);
+            background: rgb(var(--c-panel) / 0.92);
+            backdrop-filter: blur(14px);
+            transition: width 0.3s ease, transform 0.3s ease;
+        }
+        .ai-inner { width: var(--ai-w); height:100vh; display:flex; flex-direction:column; min-width:0; transition: opacity .2s ease; }
+        #appShell.ai-closed { --ai-w: 0px; }
+        #appShell.ai-closed #aiSidebar { border-left-color: transparent; }
+        #appShell.ai-closed .ai-inner { opacity:0; pointer-events:none; }
+        #aiResizeHandle {
+            flex:0 0 5px; cursor:col-resize; background:transparent;
+            transition: background .2s ease; z-index:55;
+        }
+        #aiResizeHandle:hover, #aiResizeHandle.dragging { background: rgb(var(--c-accent) / 0.5); }
+
+        /* 移动端 / 窄屏：全屏覆盖式抽屉 + 遮罩 */
+        #aiOverlay { display:none; position:fixed; inset:0; background: rgb(0 0 0 / 0.45); z-index:58; opacity:0; transition: opacity .3s ease; }
+        @media (max-width: 1023.98px) {
+            #aiSidebar {
+                position:fixed; top:0; right:0; bottom:0; z-index:60;
+                width:min(100vw, var(--ai-w));
+                transform: translateX(100%);
+                box-shadow: -12px 0 40px rgb(0 0 0 / 0.35);
+            }
+            body.ai-open #aiSidebar { transform: none; }
+            body.ai-open #aiOverlay { display:block; opacity:1; }
+            #aiResizeHandle { display:none; }
+            #appShell.ai-closed .ai-inner { opacity:1; }
+            .scroll-root { padding: 0.5rem; }
+        }
+
+        /* ── 断点降列：侧边栏展开时（1280–1600px）左侧自适应降列 ── */
+        @media (min-width: 1024px) and (max-width: 1599.98px) {
+            body.ai-open .main-grid  { grid-template-columns: minmax(0,1fr) !important; }
+            body.ai-open .grid-2     { grid-template-columns: minmax(0,1fr) !important; }
+            body.ai-open .hero-grid  { grid-template-columns: repeat(2, minmax(0,1fr)) !important; }
+            body.ai-open .hero-grid > .hero-span-rest { grid-column: span 2; }
+            body.ai-open .stat-grid  { grid-template-columns: minmax(0,1fr) !important; }
+        }
+        @media (max-width: 640px) {
+            .hero-grid { grid-template-columns: 1fr !important; }
+            .hero-grid > .hero-span-rest { grid-column: auto; }
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           AI SIDEBAR 内部组件
+           ═══════════════════════════════════════════════════════════ */
+        .ai-head { display:flex; align-items:center; gap:.5rem; padding:.75rem 1rem; border-bottom:1px solid rgb(var(--c-border)/0.6); }
+        .ai-status-dot { width:8px; height:8px; border-radius:9999px; }
+        .ai-msgs { flex:1 1 0%; overflow-y:auto; padding:1rem; display:flex; flex-direction:column; gap:.75rem; min-height:0; }
+        .msg { max-width:96%; border-radius:0.75rem; padding:.65rem .85rem; font-size:13px; line-height:1.65; }
+        .msg-user { align-self:flex-end; background: rgb(var(--c-accent)); color: rgb(var(--c-accent-contrast)); border-bottom-right-radius: .2rem; white-space: pre-wrap; word-break: break-word; }
+        .msg-ai { align-self:flex-start; background: rgb(var(--c-elevated) / 0.9); border:1px solid rgb(var(--c-border)/0.5); color: rgb(var(--c-text)); border-bottom-left-radius:.2rem; width: 100%; max-width: 100%; }
+        .msg-err { align-self:stretch; background: rgb(var(--c-bad) / 0.10); border:1px solid rgb(var(--c-bad)/0.5); color: rgb(var(--c-text)); }
+        .msg-sys-tip { align-self:center; font-size:11px; color: rgb(var(--c-text-3)); background: rgb(var(--c-panel)/0.6); border:1px dashed rgb(var(--c-border)); border-radius:9999px; padding:.2rem .8rem; }
+
+        /* Markdown 渲染体 */
+        .md-body > *:first-child { margin-top:0; } .md-body > *:last-child { margin-bottom:0; }
+        .md-body h1, .md-body h2, .md-body h3, .md-body h4 { color: rgb(var(--c-text)); font-weight:700; margin:.8em 0 .4em; line-height:1.35; }
+        .md-body h1 { font-size:1.15rem; } .md-body h2 { font-size:1.05rem; } .md-body h3, .md-body h4 { font-size:.95rem; }
+        .md-body p { margin:.5em 0; }
+        .md-body a { color: rgb(var(--c-accent)); text-decoration: underline; }
+        .md-body ul, .md-body ol { margin:.5em 0; padding-left:1.4em; }
+        .md-body ul { list-style: disc; } .md-body ol { list-style: decimal; }
+        .md-body li { margin:.2em 0; }
+        .md-body strong { color: rgb(var(--c-text)); }
+        .md-body code { font-family:'JetBrains Mono',monospace; font-size:.85em; background: rgb(var(--c-bg2) / 0.9); color: rgb(var(--c-text)); padding:.1em .35em; border-radius:.3em; }
+        .md-body pre { background: rgb(var(--c-bg2) / 0.95); border:1px solid rgb(var(--c-border)/0.5); color: rgb(var(--c-text)); border-radius:.5rem; padding:.75rem; overflow-x:auto; margin:.6em 0; }
+        .md-body pre code { background:transparent; padding:0; }
+        .md-body table { border-collapse:collapse; width:100%; margin:.6em 0; font-size:12px; }
+        .md-body th, .md-body td { border:1px solid rgb(var(--c-border)/0.7); padding:.35rem .5rem; text-align:left; color: rgb(var(--c-text)); }
+        .md-body th { background: rgb(var(--c-elevated)); color: rgb(var(--c-text-2)); font-weight:700; }
+        .md-body tr:nth-child(even) td { background: rgb(var(--c-elevated) / 0.45); }
+        .md-body blockquote { border-left:3px solid rgb(var(--c-accent)); padding-left:.75rem; color: rgb(var(--c-text-2)); margin:.6em 0; }
+        .md-body hr { border-color: rgb(var(--c-border)); margin: .8em 0; }
+
+        /* AI 推荐配置卡 */
+        .cfg-card { border:1px solid rgb(var(--c-ok)/0.55); background: rgb(var(--c-ok)/0.07); border-radius:.6rem; padding:.75rem; margin-top:.5rem; font-size:12px; }
+        .cfg-row { display:flex; align-items:center; gap:.4rem; padding:.2rem 0; flex-wrap:wrap; }
+        .cfg-row .arrow { color: rgb(var(--c-text-3)); }
+        .cfg-row.changed { background: rgb(var(--c-warn)/0.12); border-radius:.35rem; padding:.25rem .4rem; }
+        .cfg-old { color: rgb(var(--c-text-3)); text-decoration: line-through; }
+        .cfg-new { color: rgb(var(--c-ok)); font-weight:700; }
+        .cfg-row.changed .cfg-new { color: rgb(var(--c-warn)); }
+
+        /* 文件 chip */
+        .file-chip { display:flex; align-items:center; gap:.5rem; border:1px solid rgb(var(--c-border)/0.7); background: rgb(var(--c-elevated)/0.85); border-radius:.6rem; padding:.4rem .6rem; font-size:11px; }
+        .file-chip .thumb { width:34px; height:34px; object-fit:cover; border-radius:.35rem; flex:0 0 auto; border:1px solid rgb(var(--c-border)); }
+        .file-chip .ficon { width:34px; height:34px; border-radius:.35rem; flex:0 0 auto; display:flex; align-items:center; justify-content:center; background: rgb(var(--c-accent)/0.14); color: rgb(var(--c-accent)); }
+        .file-chip .fmeta { min-width:0; flex:1; }
+        .file-chip .fname { font-weight:600; color: rgb(var(--c-text)); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .file-chip .fstat { font-size:10px; }
+        .file-chip .fdel { color: rgb(var(--c-text-3)); cursor:pointer; flex:0 0 auto; padding:.15rem; border-radius:.3rem; }
+        .file-chip .fdel:hover { color: rgb(var(--c-bad)); background: rgb(var(--c-bad)/0.12); }
+        .st-parsing { color: rgb(var(--c-accent)); }
+        .st-ready   { color: rgb(var(--c-ok)); }
+        .st-failed  { color: rgb(var(--c-bad)); }
+
+        /* 拖拽遮罩 */
+        .drop-highlight { outline: 2px dashed rgb(var(--c-accent)); outline-offset: -8px; background: rgb(var(--c-accent)/0.06) !important; }
+
+        /* 模型快捷切换胶囊 */
+        .seg { display:inline-flex; border:1px solid rgb(var(--c-border)/0.8); border-radius:9999px; padding:2px; background: rgb(var(--c-panel)/0.7); }
+        .seg button { border-radius:9999px; padding:.15rem .7rem; font-size:11px; font-weight:700; color: rgb(var(--c-text-3)); transition:all .2s ease; }
+        .seg button.on { background: rgb(var(--c-accent)); color: rgb(var(--c-accent-contrast)); }
+
+        /* 设置面板 */
+        .modal-mask { position:fixed; inset:0; z-index:70; background: rgb(0 0 0 / 0.5); display:flex; align-items:center; justify-content:center; padding:1rem; }
+        .modal-box { width:100%; max-width:460px; max-height:88vh; overflow-y:auto; background: rgb(var(--c-panel)); border:1px solid rgb(var(--c-border)); border-radius:1rem; box-shadow: 0 24px 60px rgb(0 0 0 / 0.4); }
+
+        /* 主题宫格选择器 */
+        .theme-menu { position:absolute; right:0; top:calc(100% + 8px); z-index:65; width:248px; padding:.6rem; border-radius:.75rem; background: rgb(var(--c-panel)); border:1px solid rgb(var(--c-border)); box-shadow: 0 16px 44px rgb(0 0 0 / 0.35); display:none; }
+        .theme-menu.open { display:block; }
+        .theme-item { display:flex; align-items:center; gap:.6rem; width:100%; padding:.45rem .5rem; border-radius:.55rem; cursor:pointer; transition:background .15s ease; color: rgb(var(--c-text-2)); font-size:12.5px; font-weight:600; }
+        .theme-item:hover { background: rgb(var(--c-elevated)); color: rgb(var(--c-text)); }
+        .theme-item .sw { width:34px; height:22px; border-radius:6px; border:1px solid rgb(0 0 0 / 0.15); flex:0 0 auto; }
+        .theme-item .tick { margin-left:auto; color: rgb(var(--c-ok)); font-weight:800; visibility:hidden; }
+        .theme-item.current .tick { visibility:visible; }
+
+        /* 输入区打字指示 */
+        .typing-dots { display:inline-flex; gap:4px; align-items:center; }
+        .typing-dots i { width:5px; height:5px; border-radius:9999px; background: rgb(var(--c-accent)); animation: tdBlink 1.2s infinite; }
+        .typing-dots i:nth-child(2) { animation-delay:.2s; } .typing-dots i:nth-child(3) { animation-delay:.4s; }
+        @keyframes tdBlink { 0%,80%,100%{opacity:.25} 40%{opacity:1} }
+    </style>
+</head>
+<body class="text-ink antialiased">
+
+<div id="appShell" class="ai-closed">
+    <!-- ══════════════ 左侧：计算区（原 calc_w_v19 全部功能） ══════════════ -->
+    <main id="calcPane">
+        <div class="scroll-root">
+            <div class="inner">
+
+                <!-- ── Header ────────────────────────────────────────── -->
+                <div class="mb-6 flex flex-wrap items-center gap-3">
+                    <div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg">
+                        <i data-lucide="calculator" class="h-5 w-5 text-white"></i>
+                    </div>
+                    <div>
+                        <h2 class="text-lg font-bold text-ink">Jayden的智能配置计算引擎</h2>
+                        <p class="text-xs text-ink3">Sizing Calculator — 基于手动配置的实时校验与满足率测算</p>
+                    </div>
+                    <div class="ml-auto flex items-center gap-2">
+                        <button type="button" id="aiToggleBtn" title="打开 / 关闭 AI 辅助分析" aria-label="AI 辅助分析"
+                            class="btn btn-accent px-3 py-2 text-xs">
+                            <i data-lucide="sparkles" class="h-4 w-4"></i>
+                            <span>AI 辅助分析</span>
+                        </button>
+                        <div class="relative" id="themePickerWrap">
+                            <button type="button" id="themePickerBtn" title="选择主题" aria-label="选择主题"
+                                class="btn btn-ghost px-3 py-2 text-xs">
+                                <span id="themeSwatch" class="inline-block h-3.5 w-3.5 rounded-full border border-white/40" style="background:#0f172a"></span>
+                                <span id="themePickerLabel">深夜</span>
+                                <i data-lucide="chevron-down" class="h-3.5 w-3.5"></i>
+                            </button>
+                            <div id="themeMenu" class="theme-menu" role="menu" aria-label="主题选择">
+                                <!-- 由 JS 渲染 6 套主题色卡 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Mode Switcher ────────────────────────────────── -->
+                <div class="mb-5 flex flex-wrap items-center gap-3">
+                    <div class="flex gap-1 rounded-xl border border-line/50 bg-panel/30 p-1 shadow-sm backdrop-blur-sm">
+                        <button type="button" id="tabPower"
+                            class="mode-tab active-power rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2">
+                            <span>⚡</span> 功率验证模式
+                        </button>
+                        <button type="button" id="tabCapacity"
+                            class="mode-tab rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2">
+                            <span>🔋</span> 容量验证模式
+                        </button>
+                    </div>
+                    <div class="recommend-wrap">
+                        <div id="modeRecommend" class="rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help"></div>
+                        <span class="tip" id="modeTooltip"></span>
+                    </div>
+                </div>
+
+                <!-- ── Two-column grid ──────────────────────────────── -->
+                <div class="main-grid grid gap-6 lg:grid-cols-2">
+
+                    <!-- LEFT COLUMN – Parameter Inputs -->
+                    <div class="space-y-5">
+
+                        <!-- ── Core parameters ──────────────────────────── -->
+                        <div class="card p-5">
+                            <div class="mb-4 flex items-center justify-between gap-2">
+                                <h3 class="flex items-center gap-2 text-sm font-bold text-ink2">
+                                    <i data-lucide="battery" class="h-4 w-4 text-accent"></i>
+                                    电池型号与系统参数
+                                </h3>
+                                <button type="button" id="saveConfigBtn" class="btn btn-ok px-3 py-1.5 text-xs">
+                                    <i data-lucide="save" class="h-3.5 w-3.5"></i>
+                                    保存配置
+                                </button>
+                            </div>
+
+                            <!-- Battery Model -->
+                            <div class="mb-4 space-y-1">
+                                <label class="lbl" for="batteryModel">Battery Model 电池型号</label>
+                                <select id="batteryModel" class="inp">
+                                    <option value="8XNFG90">8XNFG90 — 13.2V 90Ah (17.3 kg)</option>
+                                    <option value="8XNFZ38">8XNFZ38 — 13.2V 38Ah (7.8 kg)</option>
+                                </select>
+                            </div>
+
+                            <!-- UPS & Voltage grid -->
+                            <div class="grid-2 grid grid-cols-2 gap-3">
+                                <!-- UPS kVA -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="upsRatingKva">UPS 容量 (kVA)</label>
+                                    <div class="relative">
+                                        <input type="number" id="upsRatingKva" value="200" step="10" min="1" class="inp">
+                                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-ink3">kVA</span>
+                                    </div>
+                                </div>
+                                <!-- System Voltage -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="systemVoltage">系统工作电压 (Vdc)</label>
+                                    <div class="relative">
+                                        <input type="number" id="systemVoltage" value="480" step="12" min="100" class="inp">
+                                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-ink3">V</span>
+                                    </div>
+                                    <p class="hint">可由右侧电压范围反算: (下限+上限)/2 或按 ± 百分值反推</p>
+                                </div>
+                                <!-- Power Factor -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="powerFactor">功率因数 (PF)</label>
+                                    <input type="number" id="powerFactor" value="0.9" step="0.01" min="0.1" max="1" class="inp">
+                                </div>
+                                <!-- Inverter Efficiency -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="inverterEfficiency">逆变器效率</label>
+                                    <input type="number" id="inverterEfficiency" value="0.95" step="0.01" min="0.5" max="1" class="inp">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Battery configuration ────────────────────── -->
+                        <div class="card p-5">
+                            <h3 class="mb-4 flex items-center gap-2 text-sm font-bold text-ink2">
+                                <i data-lucide="activity" class="h-4 w-4 text-accent"></i>
+                                电池组配置
+                            </h3>
+                            <div class="grid-2 grid grid-cols-2 gap-3">
+                                <!-- EPV -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="epv">单节电芯截止电压 (EPV)</label>
+                                    <div class="relative">
+                                        <input type="number" id="epv" value="1.35" step="0.05" min="1.0" max="1.6" class="inp">
+                                        <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-ink3">V</span>
+                                    </div>
+                                    <p class="hint">单节电池截止电压: EPV × 8 = <span id="batteryEpvDisplay">10.80</span> V</p>
+                                </div>
+                                <!-- Cells per String -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="cellsPerString">单组电芯总节数</label>
+                                    <input type="number" id="cellsPerString" value="290" step="8" min="8" class="inp">
+                                    <p class="hint">自动默认: ⌊系统电压 / 1.65⌋ = <span id="autoCellsDisplay">290</span> 节 · 与块数联动 (节数 = 块数×8)</p>
+                                </div>
+                                <!-- Number of Strings (groups) -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="numberOfStrings">配置的电池组数</label>
+                                    <input type="number" id="numberOfStrings" value="2" step="1" min="1" class="inp">
+                                </div>
+                                <!-- Blocks per group (editable, two-way linked) -->
+                                <div class="space-y-1">
+                                    <label class="lbl" for="blocksPerGroupDisplay">单组电池块数</label>
+                                    <input type="number" id="blocksPerGroupDisplay" value="37" step="1" min="1" class="inp">
+                                    <p class="hint">默认 ⌈节数 / 8⌉，可手动调节；手动改动将令节数 = 块数×8 并重算</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- ── Advanced Options (collapsible) ────────────── -->
+                        <div class="card overflow-hidden">
+                            <button type="button" id="advancedToggle"
+                                class="flex w-full items-center justify-between px-5 py-3 text-sm font-bold text-ink2 transition hover:text-accent"
+                                onclick="toggleAdvanced()">
+                                <span class="flex items-center gap-2">
+                                    <i data-lucide="chevron-down" class="h-4 w-4 text-ink3 chevron-icon" id="chevronIcon"></i>
+                                    高级参数 Advanced
+                                </span>
+                                <i data-lucide="chevron-down" class="h-4 w-4 chevron-icon" id="chevronIconRight"></i>
+                            </button>
+                            <div class="advanced-content border-t border-line/40 px-5 pb-5 pt-4" id="advancedContent">
+                                <div class="grid-2 grid grid-cols-2 gap-3">
+                                    <div class="space-y-1">
+                                        <label class="lbl" for="designMargin">设计余量</label>
+                                        <input type="number" id="designMargin" value="1" step="0.01" min="0.8" max="2" class="inp">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="lbl" for="agingFactor">老化系数</label>
+                                        <input type="number" id="agingFactor" value="1" step="0.01" min="0.5" max="2" class="inp">
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="lbl" for="temperature">环境温度 (℃)</label>
+                                        <div class="relative">
+                                            <input type="number" id="temperature" value="20" step="1" min="-20" max="60" class="inp">
+                                            <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-ink3">℃</span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p class="mt-3 text-[11px] text-ink3">
+                                    温度系数公式: TCV = 1.9 − 0.016 × (T − 25℃) = <span class="font-bold text-accent" id="tcvDisplay">—</span>
+                                    <span class="ml-2 text-ink3">(仅显示，不参与功率计算)</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <!-- ── Backup Time Selector ──────────────────────── -->
+                        <div class="card p-5">
+                            <h3 class="mb-3 flex items-center gap-2 text-sm font-bold text-ink2">
+                                <i data-lucide="clock" class="h-4 w-4 text-accent"></i>
+                                要求的备电时间
+                            </h3>
+                            <div class="flex flex-wrap gap-2" id="backupTimeButtons">
+                                <button type="button" data-time="5"  class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">5 min</button>
+                                <button type="button" data-time="6"  class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">6 min</button>
+                                <button type="button" data-time="7.5" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">7.5 min</button>
+                                <button type="button" data-time="10" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">10 min</button>
+                                <button type="button" data-time="12.5" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">12.5 min</button>
+                                <button type="button" data-time="15" class="btn-time active rounded-lg px-4 py-2 text-sm font-semibold">15 min</button>
+                                <button type="button" data-time="20" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">20 min</button>
+                                <button type="button" data-time="30" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">30 min</button>
+                                <button type="button" data-time="45" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">45 min</button>
+                                <button type="button" data-time="60" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">60 min</button>
+                                <button type="button" data-time="120" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">2 h</button>
+                                <button type="button" data-time="180" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">3 h</button>
+                                <button type="button" data-time="240" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">4 h</button>
+                                <button type="button" data-time="300" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">5 h</button>
+                                <button type="button" data-time="360" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">6 h</button>
+                                <button type="button" data-time="480" class="btn-time rounded-lg px-4 py-2 text-sm font-semibold">8 h</button>
+                            </div>
+                            <p class="mt-3 text-xs text-ink3">
+                                当前选择: <span class="font-semibold text-ink2" id="currentBackupTime">15 分钟</span>
+                            </p>
+                        </div>
+
+                        <!-- ── Saved Configurations ─────────────────────── -->
+                        <div class="card p-5">
+                            <div class="mb-3 flex items-center gap-2">
+                                <i data-lucide="save" class="h-4 w-4 text-ok"></i>
+                                <h3 class="text-sm font-bold text-ink2">已保存的配置 Saved Configurations</h3>
+                            </div>
+                            <p class="mb-3 text-xs text-ink3">点击任意配置可一键回填到计算器</p>
+                            <div id="savedConfigsList" class="grid gap-2 grid-cols-1">
+                            </div>
+                            <p id="savedConfigsEmpty" class="mt-1 rounded-lg border border-dashed border-line/80 bg-panel/30 py-5 text-center text-xs text-ink3">暂无保存的配置，点击“保存配置”开始</p>
+                        </div>
+
+                        <!-- ── Current Config Summary (copyable) ────────── -->
+                        <div class="card p-5">
+                            <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                <h3 class="flex items-center gap-2 text-sm font-bold text-ink2">
+                                    <i data-lucide="clipboard-list" class="h-4 w-4 text-accent"></i>
+                                    当前配置详细信息
+                                </h3>
+                                <div class="flex gap-2">
+                                    <button type="button" id="copyConfigBtn" class="btn btn-accent px-3 py-1.5 text-xs">
+                                        <i data-lucide="copy" class="h-3.5 w-3.5"></i>
+                                        <span id="copyConfigBtnText">一键复制</span>
+                                    </button>
+                                    <button type="button" id="exportTableBtn" class="btn btn-ok px-3 py-1.5 text-xs">
+                                        <i data-lucide="table" class="h-3.5 w-3.5"></i>
+                                        <span>导出表格</span>
+                                    </button>
+                                </div>
+                            </div>
+                            <p class="mb-2 text-xs text-ink3">点击「一键复制」即可复制下方电池配置信息，直接发送给同事或客户。</p>
+                            <pre id="configSummaryText" class="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-line/60 bg-elev/70 p-3 font-mono text-[11px] leading-relaxed text-ink2"></pre>
+                        </div>
+
+                        <!-- ── Calculation Steps ────────────────────────── -->
+                        <div class="card-deep p-5">
+                            <div class="mb-3 flex items-center gap-2">
+                                <span id="stepsIcon">⚡</span>
+                                <h3 class="text-sm font-bold text-ink" id="stepsTitle">计算步骤详解 (功率验证)</h3>
+                            </div>
+                            <div id="calcStepsContent" class="space-y-1 text-xs"></div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN – Results HUD -->
+                    <div class="space-y-5" id="resultsPanel">
+                        <!-- ── Voltage Boundary Validation Panel ─────────── -->
+                        <div id="voltagePanel" class="vpanel vpanel-ok">
+                            <div class="mb-3 flex items-center gap-2">
+                                <i data-lucide="shield-check" class="h-5 w-5 text-ok" id="voltagePanelIcon"></i>
+                                <h4 class="text-sm font-bold text-ok" id="voltagePanelTitle">电压匹配度仪表盘 Voltage Boundary</h4>
+                                <span class="badge badge-ok ml-auto" id="voltagePanelBadge">✓ 匹配 MATCHED</span>
+                            </div>
+                            <!-- UPS Voltage Range -->
+                            <div class="mb-3 space-y-1">
+                                <div class="flex items-center justify-between">
+                                    <p class="text-[11px] font-semibold uppercase tracking-wider text-ink2">UPS 逆变/整流电压范围</p>
+                                    <div class="flex items-center gap-1 text-xs text-ink2">
+                                        <span class="font-mono">±</span>
+                                        <input type="number" id="voltageRangePercent" value="20" step="1" min="0" max="100"
+                                            class="inp-sm w-14 px-1.5 py-0.5 text-center font-mono">
+                                        <span class="font-mono">%</span>
+                                    </div>
+                                </div>
+                                <div class="flex items-center gap-3 text-sm">
+                                    <input type="number" id="vvUpsLower" value="384" step="1" class="inp-sm w-24 px-2 py-0.5 text-center font-mono">
+                                    <div class="h-1 flex-1 rounded-full" style="background:linear-gradient(90deg, rgb(var(--c-accent)/0.5), rgb(var(--c-accent)))"></div>
+                                    <input type="number" id="vvUpsUpper" value="576" step="1" class="inp-sm w-24 px-2 py-0.5 text-center font-mono">
+                                </div>
+                                <p class="mt-1 text-[10px] text-accent">提示: 直接编辑上方上/下限电压，将按 ± 百分值自动反算「系统工作电压」。</p>
+                            </div>
+                            <!-- Battery String Range -->
+                            <div class="space-y-2">
+                                <p class="text-[11px] font-semibold uppercase tracking-wider text-ink2">电池组电压范围</p>
+                                <div class="space-y-2">
+                                    <!-- Discharge lower -->
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <span class="badge badge-ok" id="vvDischargeBadge">✓</span>
+                                        <span class="min-w-[140px] text-xs text-ink2">放电下限 (EPV×节数)</span>
+                                        <span class="font-mono text-sm font-bold text-ok" id="vvDischargeLower">—</span>
+                                        <span class="text-[10px] text-bad hidden" id="vvDischargeWarn"></span>
+                                    </div>
+                                    <!-- Charge upper -->
+                                    <div class="flex flex-wrap items-center gap-3">
+                                        <span class="badge badge-ok" id="vvChargeBadge">✓</span>
+                                        <span class="min-w-[140px] text-xs text-ink2">充电上限 (TCV×节数)</span>
+                                        <span class="font-mono text-sm font-bold text-ok" id="vvChargeUpper">—</span>
+                                        <span class="text-[10px] text-bad hidden" id="vvChargeWarn"></span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="capResultsPanel" style="display:none"></div>
+
+                        <!-- ── POWER-ONLY CONTENT ─────────────────────────── -->
+                        <div id="pwOnlyBlock">
+                        <!-- ── Hero metrics (3 cards) ───────────────────── -->
+                        <div class="hero-grid grid grid-cols-3 gap-3">
+                            <div id="heroSatisfaction" class="hero-card hero-ok">
+                                <p class="hero-label">容量满足率</p>
+                                <p class="hero-value" id="heroSatisfactionValue">—<span class="ml-1 text-lg">%</span></p>
+                                <p class="hero-unit">Satisfaction</p>
+                            </div>
+                            <div class="hero-card hero-info">
+                                <p class="hero-label">预估后备时间</p>
+                                <p class="hero-value" id="heroRunTime">—</p>
+                                <p class="hero-unit">mins</p>
+                            </div>
+                            <div class="hero-card hero-neutral hero-span-rest">
+                                <p class="hero-label">系统总重</p>
+                                <p class="hero-value" id="heroWeight">—</p>
+                                <p class="hero-unit">kg</p>
+                            </div>
+                        </div>
+
+                        <!-- ── Detail cards (StatCards) ─────────────────── -->
+                        <div class="stat-grid grid grid-cols-2 gap-3">
+                            <!-- 电池总功率需求（自动/手动） -->
+                            <div class="stat-card" id="cardRequiredPower">
+                                <div class="mb-2 flex items-center justify-between gap-2">
+                                    <div class="flex items-center gap-2 text-ink3">
+                                        <i data-lucide="zap" class="h-4 w-4"></i>
+                                        <span class="stat-title">电池总功率需求</span>
+                                    </div>
+                                    <div class="flex items-center gap-0.5 rounded-md bg-panel/80 p-0.5">
+                                        <button type="button" id="powerModeAutoBtn" class="pm-btn pm-active rounded px-2 py-0.5 text-[10px] font-bold transition">自动</button>
+                                        <button type="button" id="powerModeManualBtn" class="pm-btn rounded px-2 py-0.5 text-[10px] font-bold transition">手动</button>
+                                    </div>
+                                </div>
+                                <p class="stat-value" id="statRequiredPower">—<span class="stat-unit ml-1.5">W</span></p>
+                                <div class="relative hidden" id="requiredPowerInputWrap">
+                                    <input type="number" id="requiredPowerInput" value="" step="100" min="0"
+                                        class="inp text-2xl font-bold tracking-tight" style="padding:.5rem .75rem">
+                                    <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-ink3">W</span>
+                                </div>
+                                <p class="stat-hint" id="requiredPowerHint">按 UPS 容量×功率因数 ÷ 逆变效率 ÷ 老化系数 × 设计余量 自动计算</p>
+                            </div>
+                            <!-- 查表单节功率 -->
+                            <div class="stat-card" id="cardWattPerCell">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="gauge" class="h-4 w-4"></i>
+                                    <span class="stat-title">查表单节功率</span>
+                                </div>
+                                <p class="stat-value" id="statWattPerCell">—<span class="stat-unit ml-1.5">W/cell</span></p>
+                                <p class="stat-hint" id="hintWattPerCell">&mdash;</p>
+                            </div>
+                            <!-- 单节电池可提供总功率 -->
+                            <div class="stat-card" id="cardPowerPerUnit">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="battery-charging" class="h-4 w-4"></i>
+                                    <span class="stat-title">单节电池可提供总功率</span>
+                                </div>
+                                <p class="stat-value" id="statPowerPerUnit">—<span class="stat-unit ml-1.5">W</span></p>
+                                <p class="stat-hint" id="hintPowerPerUnit">&mdash;</p>
+                            </div>
+                            <!-- 单组可提供总功率 -->
+                            <div class="stat-card" id="cardPowerPerString">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="activity" class="h-4 w-4"></i>
+                                    <span class="stat-title">单组可提供总功率</span>
+                                </div>
+                                <p class="stat-value" id="statPowerPerString">—<span class="stat-unit ml-1.5">W</span></p>
+                                <p class="stat-hint" id="hintPowerPerString">&mdash;</p>
+                            </div>
+                            <!-- 电池最大放电电流 -->
+                            <div class="stat-card" id="cardMaxCurrent">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="trending-up" class="h-4 w-4"></i>
+                                    <span class="stat-title">电池最大放电电流</span>
+                                </div>
+                                <p class="stat-value" id="statMaxCurrent">—<span class="stat-unit ml-1.5">A</span></p>
+                                <p class="stat-hint" id="hintMaxCurrent">&mdash;</p>
+                            </div>
+                            <!-- 单组最大电流 -->
+                            <div class="stat-card" id="cardMaxCurrentPerString">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="git-branch" class="h-4 w-4"></i>
+                                    <span class="stat-title">单组最大电流</span>
+                                </div>
+                                <p class="stat-value" id="statMaxCurrentPerString">—<span class="stat-unit ml-1.5">A</span></p>
+                                <p class="stat-hint" id="hintMaxCurrentPerString">&mdash;</p>
+                            </div>
+                            <!-- 配置的电池标称电压 -->
+                            <div class="stat-card" id="cardNominalVoltage">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="battery-full" class="h-4 w-4"></i>
+                                    <span class="stat-title">配置的电池标称电压</span>
+                                </div>
+                                <p class="stat-value" id="statNominalVoltage">—<span class="stat-unit ml-1.5">V</span></p>
+                                <p class="stat-hint" id="hintNominalVoltage">&mdash;</p>
+                            </div>
+                            <!-- 配置的电池浮充电压 -->
+                            <div class="stat-card" id="cardFloatVoltage">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="plug-zap" class="h-4 w-4"></i>
+                                    <span class="stat-title">配置的电池浮充电压</span>
+                                </div>
+                                <p class="stat-value" id="statFloatVoltage">—<span class="stat-unit ml-1.5">V</span></p>
+                                <p class="stat-hint" id="hintFloatVoltage">&mdash;</p>
+                            </div>
+                        </div>
+
+                        <!-- ── Technical summary ────────────────────────── -->
+                        <div class="stat-card">
+                            <h4 class="stat-title mb-3">配置详情 Configuration Details</h4>
+                            <div class="space-y-2 text-xs text-ink2" id="configDetails">
+                            </div>
+                        </div>
+
+                        <!-- ── Discharge Power Tables ───────────────────── -->
+                        <div class="space-y-4" id="dischargeTables">
+                        </div>
+                        </div><!-- end pwOnlyBlock -->
+
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </main>
+
+    <!-- 拖拽调宽手柄（≥1024px 可见） -->
+    <div id="aiResizeHandle" title="拖拽调节 AI 侧边栏宽度"></div>
+
+    <!-- ══════════════ 右侧：AI 辅助分析侧边栏 ══════════════ -->
+    <aside id="aiSidebar" aria-label="AI 辅助分析">
+        <div class="ai-inner">
+            <!-- 头部 -->
+            <div class="ai-head">
+                <i data-lucide="sparkles" class="h-4.5 w-4.5 text-accent" style="width:18px;height:18px"></i>
+                <span class="text-sm font-bold text-ink">AI 辅助分析</span>
+                <span id="aiStatusBadge" class="badge badge-acc" title="后端连接状态">
+                    <span class="ai-status-dot" id="aiStatusDot" style="display:inline-block;background:rgb(var(--c-text-3));vertical-align:middle"></span>
+                    <span id="aiStatusText">检测中</span>
+                </span>
+                <div class="ml-auto flex items-center gap-1">
+                    <button type="button" id="aiSettingsBtn" title="AI 设置" aria-label="AI 设置" class="btn btn-ghost h-8 w-8 !p-0">
+                        <i data-lucide="settings" class="h-4 w-4"></i>
+                    </button>
+                    <button type="button" id="aiCloseBtn" title="收起侧边栏" aria-label="收起侧边栏" class="btn btn-ghost h-8 w-8 !p-0">
+                        <i data-lucide="panel-right-close" class="h-4 w-4"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- 引导卡片（未配置密钥 / 未连接后端时显示） -->
+            <div id="aiGuideCard" class="mx-4 mt-3 rounded-xl border border-dashed border-line bg-panel/60 p-4 text-xs leading-relaxed text-ink2" style="display:none">
+                <p class="mb-2 flex items-center gap-1.5 font-bold text-ink"><i data-lucide="rocket" class="h-4 w-4 text-accent"></i>开始使用 AI 辅助分析</p>
+                <p id="aiGuideBody">1. 点击右上角 ⚙ 打开设置；<br>2. 若服务端已配置密钥可直接使用，或在设置中填入个人 DeepSeek API Key（仅存本机浏览器）；<br>3. 点击「发送当前配置」让 AI 基于页面公式给出配置建议。</p>
+                <button type="button" id="aiGuideSettingsBtn" class="btn btn-accent mt-3 px-3 py-1.5 text-xs">打开 AI 设置</button>
+            </div>
+
+            <!-- 消息区 -->
+            <div id="aiMsgs" class="ai-msgs">
+                <div class="msg-sys-tip">AI 可读取放电表并严格按页面公式复算 · 回复末尾输出可一键填入的推荐配置</div>
+            </div>
+
+            <!-- 底部输入区 -->
+            <div class="border-t border-line/60 bg-panel/70 p-3" id="aiDropZone">
+                <!-- 快捷操作行 -->
+                <div class="mb-2 flex flex-wrap items-center gap-1.5">
+                    <button type="button" id="aiSendContextBtn" class="btn btn-ghost px-2.5 py-1 text-[11px]" title="把当前全部输入与关键结果作为上下文附加到下一条消息">
+                        <i data-lucide="clipboard-copy" class="h-3.5 w-3.5"></i> 发送当前配置
+                    </button>
+                    <button type="button" id="aiAttachBtn" class="btn btn-ghost px-2.5 py-1 text-[11px]" title="选择文件（Excel / PDF / 图片，可多选）">
+                        <i data-lucide="paperclip" class="h-3.5 w-3.5"></i> 附件
+                    </button>
+                    <input type="file" id="aiFileInput" multiple accept=".xlsx,.xls,.csv,.pdf,.png,.jpg,.jpeg,.webp,.gif,.bmp" class="hidden">
+                    <button type="button" id="aiClearChatBtn" class="btn btn-ghost px-2.5 py-1 text-[11px]" title="清空对话（不影响页面配置）">
+                        <i data-lucide="eraser" class="h-3.5 w-3.5"></i> 清空对话
+                    </button>
+                </div>
+
+                <!-- 上下文 chip -->
+                <div id="aiContextChips" class="mb-2 flex flex-wrap gap-1.5" style="display:none"></div>
+                <!-- 文件 chips -->
+                <div id="aiFileChips" class="mb-2 grid gap-1.5" style="display:none"></div>
+
+                <!-- 模型行 -->
+                <div class="mb-2 flex items-center justify-between gap-2">
+                    <span class="min-w-0 truncate text-[11px] text-ink3" id="aiCurrentModel">deepseek-flash</span>
+                    <div class="seg" id="aiModelSeg" role="group" aria-label="模型快捷切换">
+                        <button type="button" data-pref="flash" class="on" title="deepseek-flash（快速 · 支持图片）">Flash</button>
+                        <button type="button" data-pref="pro" title="deepseek-v4-pro（强推理）">Pro</button>
+                    </div>
+                </div>
+
+                <!-- 文本输入 + 发送 -->
+                <div class="relative">
+                    <textarea id="aiInput" rows="3" placeholder="向 AI 描述需求，例如「按 2 小时备电推荐组数」…（Ctrl+Enter 发送，可直接粘贴图片 / 拖入文件）"
+                        class="inp w-full resize-none pr-20 text-[13px] leading-relaxed" style="max-height:140px"></textarea>
+                    <div class="absolute bottom-2 right-2 flex items-center gap-1">
+                        <button type="button" id="aiStopBtn" class="btn btn-bad px-2.5 py-1.5 text-[11px]" title="停止生成" style="display:none">
+                            <i data-lucide="square" class="h-3.5 w-3.5"></i> 停止
+                        </button>
+                        <button type="button" id="aiSendBtn" class="btn btn-accent px-3 py-1.5 text-[11px]" title="发送 (Ctrl+Enter)">
+                            <i data-lucide="send" class="h-3.5 w-3.5"></i> 发送
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 注入规则折叠面板 -->
+                <details class="mt-2 rounded-lg border border-line/60 bg-panel/50 px-3 py-2" id="aiRulesPanel">
+                    <summary class="cursor-pointer select-none text-[11px] font-bold text-ink2">查看注入给 AI 的计算规则（System Prompt）</summary>
+                    <pre id="aiRulesContent" class="mt-2 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg bg-elev/70 p-2 font-mono text-[10px] leading-relaxed text-ink2"></pre>
+                </details>
+            </div>
+        </div>
+    </aside>
+</div>
+
+<!-- 移动端抽屉遮罩 -->
+<div id="aiOverlay"></div>
+
+<!-- ══════════════ AI 设置面板 ══════════════ -->
+<div id="aiSettingsModal" class="modal-mask" style="display:none">
+    <div class="modal-box" role="dialog" aria-modal="true" aria-label="AI 设置">
+        <div class="flex items-center justify-between border-b border-line/60 px-5 py-3">
+            <h3 class="flex items-center gap-2 text-sm font-bold text-ink"><i data-lucide="settings" class="h-4 w-4 text-accent"></i> AI 设置</h3>
+            <button type="button" id="aiSettingsCloseBtn" class="btn btn-ghost h-8 w-8 !p-0" aria-label="关闭设置"><i data-lucide="x" class="h-4 w-4"></i></button>
+        </div>
+        <div class="space-y-4 px-5 py-4 text-xs text-ink2">
+            <!-- 后端状态 -->
+            <div class="rounded-lg border border-line/60 bg-elev/60 p-3" id="srvStatusBox">
+                <p class="font-bold text-ink">后端服务状态</p>
+                <p class="mt-1" id="srvStatusText">检测中…</p>
+            </div>
+
+            <!-- API Key -->
+            <div class="space-y-1.5">
+                <label class="lbl" for="aiKeyInput">DeepSeek API Key</label>
+                <p class="text-[11px] text-ink3" id="aiKeyHint">优先使用服务端 .env 中配置的密钥（前端不接触密钥）；也可在下方填入个人密钥，仅保存在本机浏览器 localStorage。</p>
+                <div class="flex items-center gap-2">
+                    <input type="password" id="aiKeyInput" placeholder="sk-..." autocomplete="off" class="inp font-mono" style="display:none">
+                    <div id="aiKeyMaskRow" class="flex flex-1 items-center gap-2 rounded-lg border border-line/70 bg-elev/90 px-3 py-2">
+                        <i data-lucide="key-round" class="h-4 w-4 text-ink3"></i>
+                        <span id="aiKeyMask" class="flex-1 truncate font-mono text-ink3">未配置个人密钥</span>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2 pt-1">
+                    <button type="button" id="aiKeyEditBtn" class="btn btn-accent px-3 py-1.5 text-[11px]">修改</button>
+                    <button type="button" id="aiKeySaveBtn" class="btn btn-ok px-3 py-1.5 text-[11px]" style="display:none">保存</button>
+                    <button type="button" id="aiKeyCancelBtn" class="btn btn-ghost px-3 py-1.5 text-[11px]" style="display:none">取消</button>
+                    <button type="button" id="aiKeyClearBtn" class="btn btn-ghost px-3 py-1.5 text-[11px]">清除</button>
+                    <button type="button" id="aiKeyTestBtn" class="btn btn-ghost px-3 py-1.5 text-[11px]">测试连接</button>
+                </div>
+                <p id="aiKeyTestResult" class="text-[11px]"></p>
+            </div>
+
+            <!-- 服务地址 -->
+            <div class="space-y-1.5">
+                <label class="lbl" for="aiServerUrl">服务地址（后端代理）</label>
+                <input type="text" id="aiServerUrl" value="/api" class="inp font-mono" placeholder="/api 或 https://your-worker.example.com/api">
+                <p class="text-[11px] text-ink3">默认同源 /api（前端由后端托管，无 CORS）。不要直连 api.deepseek.com —— 官方端点不返回 CORS 头，浏览器会拦截。</p>
+            </div>
+
+            <!-- 模型 -->
+            <div class="space-y-1.5">
+                <label class="lbl" for="aiModelSelect">对话模型</label>
+                <div class="flex gap-2">
+                    <select id="aiModelSelect" class="inp"></select>
+                    <button type="button" id="aiModelRefreshBtn" class="btn btn-ghost px-3" title="刷新模型列表"><i data-lucide="refresh-cw" class="h-3.5 w-3.5"></i></button>
+                </div>
+                <p class="text-[11px] text-ink3">启动时自动请求 GET /api/models 拉取官方模型；失败时回退内置列表。</p>
+            </div>
+
+            <!-- 其他参数 -->
+            <div class="grid-2 grid grid-cols-2 gap-3">
+                <div class="space-y-1">
+                    <label class="lbl" for="aiTemperature">Temperature</label>
+                    <input type="number" id="aiTemperature" value="0.7" step="0.1" min="0" max="2" class="inp">
+                </div>
+                <div class="space-y-1">
+                    <label class="lbl" for="aiMaxTokens">Max Tokens</label>
+                    <input type="number" id="aiMaxTokens" value="8192" step="256" min="256" max="65536" class="inp">
+                </div>
+                <div class="space-y-1">
+                    <label class="lbl" for="aiTimeoutSec">超时时间 (秒)</label>
+                    <input type="number" id="aiTimeoutSec" value="120" step="10" min="10" max="600" class="inp">
+                </div>
+                <div class="space-y-1">
+                    <label class="lbl" for="aiHistoryRounds">上下文保留轮数</label>
+                    <input type="number" id="aiHistoryRounds" value="8" step="1" min="1" max="50" class="inp">
+                </div>
+                <label class="col-span-2 flex cursor-pointer items-center gap-2 rounded-lg border border-line/60 bg-elev/60 p-2.5">
+                    <input type="checkbox" id="aiStreamToggle" checked class="h-4 w-4 accent-current">
+                    <span class="font-semibold text-ink2">流式输出（SSE，逐字渲染，可随时停止）</span>
+                </label>
+            </div>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-line/60 px-5 py-3">
+            <button type="button" id="aiSettingsSaveBtn" class="btn btn-accent px-4 py-2 text-xs">保存设置</button>
+        </div>
+    </div>
+</div>
+
+<input type="hidden" id="backupTimeInput" value="15">
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+// DATA LAYER
+// ══════════════════════════════════════════════════════════════════
+const BATTERY_MODELS = [
+    {
+        id: "8XNFG90",
+        dischargeTable: {
+            "1.45": { 5:815.1, 6:771.4, 10:614.5, 15:484.8, 20:385.4, 30:261.8, 45:179.9, 60:140.9, 120:72.8, 180:48.7, 240:36.7, 300:29.5, 360:24.8, 480:18.7, 600:15.1, 720:12.6, 900:10.2, 1200:7.6 },
+            "1.40": { 5:907.4, 6:840.1, 10:641.2, 15:493.4, 20:392.6, 30:272.9, 45:185.2, 60:141.4, 120:73.5, 180:49.3, 240:37.0, 300:29.6, 360:24.9, 480:18.9, 600:15.2, 720:12.7, 900:10.2, 1200:7.7 },
+            "1.35": { 5:973.8, 6:893.4, 10:663.7, 15:502.0, 20:397.2, 30:274.3, 45:186.7, 60:141.6, 120:73.9, 180:49.4, 240:37.2, 300:29.9, 360:25.1, 480:19.0, 600:15.3, 720:12.8, 900:10.3, 1200:7.7 },
+            "1.30": { 5:1007.0, 6:924.3, 10:683.5, 15:509.9, 20:398.1, 30:274.9, 45:188.7, 60:141.6, 120:74.2, 180:49.6, 240:37.4, 300:30.0, 360:25.2, 480:19.0, 600:15.3, 720:12.8, 900:10.3, 1200:7.7 },
+            "1.25": { 5:1053.8, 6:960.5, 10:695.4, 15:512.7, 20:399.4, 30:276.1, 45:189.1, 60:141.8, 120:74.4, 180:49.7, 240:37.5, 300:30.1, 360:25.2, 480:19.1, 600:15.3, 720:12.8, 900:10.3, 1200:7.7 },
+            "1.20": { 5:1096.2, 6:997.0, 10:703.6, 15:513.9, 20:400.6, 30:278.1, 45:190.2, 60:142.7, 120:74.6, 180:49.8, 240:37.5, 300:30.1, 360:25.3, 480:19.1, 600:15.3, 720:12.8, 900:10.3, 1200:7.7 }
+        },
+        specs: { label: "13.2V 90Ah", weightKg: 17.3, lengthM: 0.2912, widthM: 0.176, heightM: 0.184, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 90 }
+    },
+    {
+        id: "8XNFZ38",
+        dischargeTable: {
+            "1.40": { 5:406, 10:283.1, 15:222.9, 20:178.5, 30:129, 45:84.9, 60:66, 120:32.4, 180:21.7, 240:16.3, 300:13.1, 360:11, 480:8.2, 600:6.5, 720:5.3 },
+            "1.35": { 5:452.2, 10:304.3, 15:230.3, 20:181.8, 30:130.3, 45:86.1, 60:67, 120:33.3, 180:22.3, 240:16.8, 300:13.5, 360:11.3, 480:8.4, 600:6.6, 720:5.5 },
+            "1.30": { 5:481.3, 10:316.1, 15:234.1, 20:183.5, 30:131, 45:86.4, 60:67.1, 120:33.5, 180:22.4, 240:16.9, 300:13.6, 360:11.4, 480:8.5, 600:6.7, 720:5.5 },
+            "1.25": { 5:501.3, 10:322.7, 15:236.1, 20:184.6, 30:131.5, 45:86.7, 60:67.4, 120:33.8, 180:22.6, 240:17.1, 300:13.7, 360:11.5, 480:8.5, 600:6.7, 720:5.5 },
+            "1.20": { 5:514.4, 10:326, 15:237.6, 20:185.3, 30:134.4, 45:87, 60:67.7, 120:34, 180:22.8, 240:17.2, 300:13.8, 360:11.6, 480:8.6, 600:6.8, 720:5.6 }
+        },
+        specs: { label: "13.2V 38Ah", weightKg: 7.8, lengthM: 0.2255, widthM: 0.1225, heightM: 0.1405, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 38 }
+    }
+];
+const BATTERY_MODEL_MAP = {};
+BATTERY_MODELS.forEach(m => { BATTERY_MODEL_MAP[m.id] = m; });
+
+// ══════════════════════════════════════════════════════════════════
+// ENGINE
+// ══════════════════════════════════════════════════════════════════
+function matchEpvKey(inputEpv, availableKeys) {
+    const sorted = availableKeys.map(Number).sort((a, b) => a - b);
+    for (const key of sorted) { if (inputEpv <= key) return key.toFixed(2); }
+    return sorted[sorted.length - 1].toFixed(2);
+}
+function matchTimePoint(targetMin, availableTimes) {
+    const sorted = [...availableTimes].sort((a, b) => a - b);
+    for (const t of sorted) { if (targetMin <= t) return t; }
+    return sorted[sorted.length - 1];
+}
+function calculate(inputs) {
+    const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
+    if (!model) throw new Error('Unknown model');
+    const { dischargeTable, specs } = model;
+    const epvKeys = Object.keys(dischargeTable);
+    const availableTimes = Object.keys(dischargeTable[epvKeys[0]]).map(Number);
+    const rangeFraction = (inputs.voltageRangePercent ?? 20) / 100;
+    const defaultUpsVoltageLower = inputs.systemVoltage * (1 - rangeFraction);
+    const defaultUpsVoltageUpper = inputs.systemVoltage * (1 + rangeFraction);
+    const upsVoltageLower = Number.isFinite(inputs.upsVoltageLower) ? inputs.upsVoltageLower : defaultUpsVoltageLower;
+    const upsVoltageUpper = Number.isFinite(inputs.upsVoltageUpper) ? inputs.upsVoltageUpper : defaultUpsVoltageUpper;
+    const batteryDischargeLower = inputs.epv * inputs.cellsPerString;
+    const temperatureCoefficient = 1.9 - 0.016 * (inputs.temperature - 25);
+    const batteryChargeUpper = temperatureCoefficient * inputs.cellsPerString;
+    const vv = {
+        upsVoltageLower, upsVoltageUpper, batteryDischargeLower, batteryChargeUpper,
+        dischargeInRange: batteryDischargeLower >= upsVoltageLower,
+        chargeInRange: batteryChargeUpper <= upsVoltageUpper
+    };
+    const autoRequiredPower = (inputs.upsRatingKva * 1000 * inputs.powerFactor) / inputs.inverterEfficiency / inputs.agingFactor * inputs.designMargin;
+    const totalRequiredPower = (inputs.requiredPowerMode === 'manual' && Number.isFinite(inputs.manualRequiredPower) && inputs.manualRequiredPower > 0)
+        ? inputs.manualRequiredPower
+        : autoRequiredPower;
+    const matchedEpvKey = matchEpvKey(inputs.epv, epvKeys);
+    const matchedTime = matchTimePoint(inputs.backupTimeMin, availableTimes);
+    const wattPerCellLookup = dischargeTable[matchedEpvKey][matchedTime];
+    const unitsPerString = inputs.cellsPerString / specs.cellsPerUnit;
+    const powerPerUnit = wattPerCellLookup * specs.cellsPerUnit;
+    const totalPowerPerString = wattPerCellLookup * inputs.cellsPerString;
+    const totalProposedPower = totalPowerPerString * inputs.numberOfStrings;
+    const satisfactionRatio = totalProposedPower / totalRequiredPower;
+    const estimatedRunTime = inputs.backupTimeMin * satisfactionRatio;
+    const maxCurrent = totalRequiredPower / (inputs.epv * inputs.cellsPerString);
+    const maxCurrentPerString = inputs.numberOfStrings > 0 ? maxCurrent / inputs.numberOfStrings : 0;
+    const totalQuantity = unitsPerString * inputs.numberOfStrings;
+    const totalWeight = totalQuantity * specs.weightKg;
+    const totalVolume = specs.lengthM * specs.widthM * specs.heightM * totalQuantity;
+    const totalEnergyKWh = (specs.ratedVoltage * specs.ratedCapacityAh * totalQuantity) / 1000;
+    // 配置电压：以「单组电池块数」为基准（与节数双向联动，块数 = ⌈节数/8⌉ / 节数 = 块数×8）
+    const blocksPerGroup = (Number.isFinite(inputs.blocksPerGroup) && inputs.blocksPerGroup > 0)
+        ? inputs.blocksPerGroup
+        : Math.ceil(inputs.cellsPerString / specs.cellsPerUnit);
+    const configNominalVoltage = 13.2 * blocksPerGroup;
+    const configFloatVoltage = (temperatureCoefficient - 0.05) * inputs.cellsPerString;
+    return {
+        voltageValidation: vv, totalRequiredPower, autoRequiredPower, matchedEpvKey, matchedTime,
+        wattPerCellLookup, powerPerUnit, unitsPerString, totalPowerPerString, totalProposedPower,
+        satisfactionRatio, estimatedRunTime, maxCurrent, maxCurrentPerString, totalWeight, totalQuantity,
+        unitLength: specs.lengthM, unitWidth: specs.widthM, unitHeight: specs.heightM,
+        totalVolume, temperatureCoefficient, totalEnergyKWh,
+        blocksPerGroup, configNominalVoltage, configFloatVoltage
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UI HELPERS
+// ══════════════════════════════════════════════════════════════════
+const fmt = (v, decimals) => {
+    if (!isFinite(v) || isNaN(v)) return "—";
+    return v.toLocaleString("en-US", { minimumFractionDigits: 0, maximumFractionDigits: decimals ?? 1 });
+};
+
+let backupTimeMin = 15;
+let showAdvanced = false;
+let requiredPowerMode = 'auto'; // 'auto' | 'manual'
+let lastAutoRequiredPower = 0;
+
+function toggleAdvanced() {
+    showAdvanced = !showAdvanced;
+    document.getElementById('advancedContent').classList.toggle('open', showAdvanced);
+    document.getElementById('chevronIcon').classList.toggle('rotated', showAdvanced);
+    document.getElementById('chevronIconRight').classList.toggle('rotated', showAdvanced);
+}
+
+// ── 节数 ↔ 块数 双向联动核心 ──
+// 节数 → 块数 = ⌈节数/8⌉（块数框未聚焦时才回填，避免打断手动输入）
+function syncBlocksFromCells() {
+    const cells = parseInt(document.getElementById('cellsPerString').value) || 0;
+    const blocksEl = document.getElementById('blocksPerGroupDisplay');
+    if (document.activeElement !== blocksEl) blocksEl.value = Math.ceil(cells / 8);
+}
+// 块数 → 节数 = 块数×8，并刷新「自动节数」显示
+function syncCellsFromBlocks() {
+    const blocks = parseInt(document.getElementById('blocksPerGroupDisplay').value) || 0;
+    const cells = blocks * 8;
+    document.getElementById('cellsPerString').value = cells;
+    document.getElementById('autoCellsDisplay').textContent = cells;
+}
+
+// Backup time button handlers
+document.getElementById('backupTimeButtons').addEventListener('click', function(e) {
+    const btn = e.target.closest('[data-time]');
+    if (!btn) return;
+    backupTimeMin = parseFloat(btn.dataset.time);
+    document.querySelectorAll('#backupTimeButtons .btn-time').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('currentBackupTime').textContent = formatBackupTimeLabel(backupTimeMin);
+    document.getElementById('backupTimeInput').value = backupTimeMin;
+    updateModeRecommend();
+    recalculate();
+});
+
+// 正向：系统电压 + 百分值 → 电压范围
+function updateUpsVoltageRangeFromPercent() {
+    const systemVoltage = parseFloat(document.getElementById('systemVoltage').value) || 0;
+    const rangePercent = parseFloat(document.getElementById('voltageRangePercent').value) || 0;
+    const rangeFraction = rangePercent / 100;
+    document.getElementById('vvUpsLower').value = (systemVoltage * (1 - rangeFraction)).toFixed(1);
+    document.getElementById('vvUpsUpper').value = (systemVoltage * (1 + rangeFraction)).toFixed(1);
+}
+
+// 反向：电压范围 + 百分值 → 系统电压
+function updateSystemVoltageFromRange(source) {
+    const rangePercent = parseFloat(document.getElementById('voltageRangePercent').value) || 0;
+    const frac = rangePercent / 100;
+    const lower = parseFloat(document.getElementById('vvUpsLower').value);
+    const upper = parseFloat(document.getElementById('vvUpsUpper').value);
+
+    let sysV = null;
+    if (source === 'lower' && isFinite(lower) && (1 - frac) > 0) {
+        sysV = lower / (1 - frac);
+    } else if (source === 'upper' && isFinite(upper) && (1 + frac) !== 0) {
+        sysV = upper / (1 + frac);
+    }
+    if (isFinite(lower) && isFinite(upper)) {
+        sysV = (lower + upper) / 2;
+    }
+    if (sysV != null && isFinite(sysV) && sysV > 0) {
+        const sysVRounded = Math.round(sysV * 10) / 10;
+        document.getElementById('systemVoltage').value = sysVRounded;
+        const autoCells = Math.round(sysVRounded / 1.65);
+        document.getElementById('cellsPerString').value = autoCells;
+        document.getElementById('autoCellsDisplay').textContent = autoCells;
+        syncBlocksFromCells();
+    }
+}
+
+// System voltage 输入 → 正向算范围 + 自动节数 + 同步块数
+document.getElementById('systemVoltage').addEventListener('input', function() {
+    const v = parseFloat(this.value) || 0;
+    const autoCells = Math.round(v / 1.65);
+    document.getElementById('cellsPerString').value = autoCells;
+    document.getElementById('autoCellsDisplay').textContent = autoCells;
+    syncBlocksFromCells();
+    updateUpsVoltageRangeFromPercent();
+    recalculate();
+});
+
+// 百分值变化 → 正向算范围
+document.getElementById('voltageRangePercent').addEventListener('input', function() {
+    updateUpsVoltageRangeFromPercent();
+    recalculate();
+});
+
+// 电压范围编辑 → 反向算系统电压
+document.getElementById('vvUpsLower').addEventListener('input', function() {
+    updateSystemVoltageFromRange('lower');
+    recalculate();
+});
+document.getElementById('vvUpsUpper').addEventListener('input', function() {
+    updateSystemVoltageFromRange('upper');
+    recalculate();
+});
+
+// 单组电芯总节数编辑 → 同步块数 (⌈节数/8⌉)
+document.getElementById('cellsPerString').addEventListener('input', function() {
+    document.getElementById('autoCellsDisplay').textContent = (parseInt(this.value) || 0);
+    syncBlocksFromCells();
+    recalculate();
+});
+
+// 单组电池块数手动编辑 → 同步节数 (块数×8) → 全量重算
+document.getElementById('blocksPerGroupDisplay').addEventListener('input', function() {
+    syncCellsFromBlocks();
+    recalculate();
+});
+
+// 其余输入 → 仅重算
+['batteryModel','upsRatingKva','powerFactor','inverterEfficiency',
+ 'epv','numberOfStrings','designMargin','agingFactor','temperature'
+].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+        el.addEventListener('input', recalculate);
+        el.addEventListener('change', recalculate);
+    }
+});
+
+// ── 电池总功率需求 自动/手动 联动 ──
+function applyPowerModeUI(mode) {
+    requiredPowerMode = (mode === 'manual') ? 'manual' : 'auto';
+    const isManual = requiredPowerMode === 'manual';
+    const autoBtn = document.getElementById('powerModeAutoBtn');
+    const manualBtn = document.getElementById('powerModeManualBtn');
+    const statP = document.getElementById('statRequiredPower');
+    const inputWrap = document.getElementById('requiredPowerInputWrap');
+    autoBtn.classList.toggle('pm-active', !isManual);
+    manualBtn.classList.toggle('pm-active', isManual);
+    statP.classList.toggle('hidden', isManual);
+    inputWrap.classList.toggle('hidden', !isManual);
+}
+function setPowerMode(mode) {
+    applyPowerModeUI(mode);
+    if (requiredPowerMode === 'manual') {
+        const reqInput = document.getElementById('requiredPowerInput');
+        if (!(parseFloat(reqInput.value) > 0)) reqInput.value = Math.round(lastAutoRequiredPower || 0);
+        reqInput.focus();
+        reqInput.select();
+    }
+    recalculate();
+}
+document.getElementById('powerModeAutoBtn').addEventListener('click', () => setPowerMode('auto'));
+document.getElementById('powerModeManualBtn').addEventListener('click', () => setPowerMode('manual'));
+document.getElementById('requiredPowerInput').addEventListener('input', recalculate);
+
+// ══════════════════════════════════════════════════════════════════
+// DISCHARGE TABLE RENDERER
+// ══════════════════════════════════════════════════════════════════
+function formatTimeLabel(min) {
+    if (min >= 60 && min % 60 === 0) return (min / 60) + 'h';
+    return min + 'min';
+}
+// 用于按钮点击后显示给用户的备电时间标签（中文友好）
+function formatBackupTimeLabel(min) {
+    if (min >= 60 && min % 60 === 0) return (min / 60) + ' 小时';
+    return min + ' 分钟';
+}
+
+function renderDischargeTable(modelId, epv, bTimeMin) {
+    const model = BATTERY_MODEL_MAP[modelId];
+    if (!model) return '';
+    const { dischargeTable } = model;
+    const epvKeys = Object.keys(dischargeTable).sort((a, b) => parseFloat(b) - parseFloat(a));
+    const timePoints = Object.keys(dischargeTable[epvKeys[0]]).map(Number).sort((a, b) => a - b);
+    const matchedEpv = matchEpvKey(epv, Object.keys(dischargeTable));
+    const matchedTime = matchTimePoint(bTimeMin, timePoints);
+    const interpTimes = new Set([]); // 7.5min/12.5min removed from all tables
+    const hasInterp = timePoints.some(t => interpTimes.has(t));
+
+    let html = `<div class="card-deep p-4">`;
+    html += `<h4 class="stat-title mb-3 flex items-center gap-2">`;
+    html += `<i data-lucide="table-2" class="h-3.5 w-3.5"></i>`;
+    html += `${modelId} 恒功率放电表 (W/Cell)</h4>`;
+    html += `<div class="discharge-table-container"><table class="w-full text-xs"><thead><tr>`;
+    html += `<th class="dt-th-head sticky left-0 z-10 px-2 py-1.5 text-left font-bold">电压</th>`;
+    timePoints.forEach(t => {
+        const isInterp = interpTimes.has(t);
+        let style = '';
+        if (t === matchedTime) style = ' style="background:rgb(var(--c-accent)/0.25);color:rgb(var(--c-text))"';
+        else if (isInterp) style = ' style="color:rgb(var(--c-warn))"';
+        html += `<th class="dt-th-head px-2 py-1.5 text-center font-bold"${style}>${formatTimeLabel(t)}</th>`;
+    });
+    html += `</tr></thead><tbody>`;
+    epvKeys.forEach(epvKey => {
+        const isMatched = epvKey === matchedEpv;
+        html += `<tr>`;
+        html += `<td class="dt-row-label sticky left-0 z-10 px-2 py-1.5 font-bold ${isMatched ? 'matched' : ''}">${epvKey}V</td>`;
+        timePoints.forEach(t => {
+            const val = dischargeTable[epvKey][t];
+            const isHL = isMatched && t === matchedTime;
+            const isInterp = interpTimes.has(t);
+            let cls = 'dt-cell';
+            let style = '';
+            if (isHL) { cls += ' hl'; }
+            else if (isMatched) { cls += ' row-match'; }
+            else if (t === matchedTime) { style = ' style="color:rgb(var(--c-text))"'; }
+            else if (isInterp) { style = ' style="color:rgb(var(--c-warn));font-style:italic"'; }
+            html += `<td class="px-2 py-1.5 text-center ${cls}"${style}>${val ?? '—'}</td>`;
+        });
+        html += `</tr>`;
+    });
+    html += `</tbody></table></div>`;
+    html += `<p class="mt-2 text-[10px] text-ink3">黄色高亮 = 当前查表位置 (EPV ${matchedEpv}V × ${matchedTime}min)</p>`;
+
+    html += `</div>`;
+    return html;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CURRENT CONFIG COPY SUMMARY  (电池信息，排除尺寸/体积/重量/高级参数/TCV/UPS)
+// ══════════════════════════════════════════════════════════════════
+let lastCopySummary = '';
+function buildConfigSummary(inputs, r) {
+    const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
+    const modelLabel = model ? (inputs.batteryModelId + ' (' + model.specs.label + ')') : inputs.batteryModelId;
+    const lines = [
+        '【电池配置详细信息 Battery Configuration】',
+        '电池型号: ' + modelLabel,
+        '系统工作电压: ' + fmt(inputs.systemVoltage, 1) + ' V',
+        '单节电芯截止电压 (EPV): ' + inputs.epv + ' V',
+        '单节电池截止电压 (EPV×8): ' + (inputs.epv * 8).toFixed(2) + ' V',
+        '单组电芯总节数: ' + inputs.cellsPerString + ' 节',
+        '单组电池块数: ' + r.blocksPerGroup + ' 块',
+        '配置电池组数: ' + inputs.numberOfStrings + ' 组',
+        '电池总数量: ' + r.totalQuantity + ' 块',
+        '配置标称电压: ' + fmt(r.configNominalVoltage, 1) + ' V',
+        '配置浮充电压 (' + inputs.temperature + '℃): ' + fmt(r.configFloatVoltage, 1) + ' V',
+        '放电下限电压: ' + fmt(r.voltageValidation.batteryDischargeLower, 1) + ' V',
+        '充电上限电压 (' + inputs.temperature + '℃): ' + fmt(r.voltageValidation.batteryChargeUpper, 1) + ' V',
+        '要求备电时间: ' + formatBackupTimeLabel(backupTimeMin),
+        '电池总功率需求: ' + fmt(r.totalRequiredPower) + ' W' + (inputs.requiredPowerMode === 'manual' ? ' (手动指定)' : ' (自动计算)'),
+        '查表单节功率: ' + fmt(r.wattPerCellLookup) + ' W/cell',
+        '单节电池可提供总功率: ' + fmt(r.powerPerUnit) + ' W',
+        '单组可提供总功率: ' + fmt(r.totalPowerPerString) + ' W',
+        '配置总功率: ' + fmt(r.totalProposedPower) + ' W',
+        '电池最大放电电流: ' + fmt(r.maxCurrent) + ' A',
+        '单组最大电流: ' + fmt(r.maxCurrentPerString) + ' A',
+        '容量满足率: ' + (r.satisfactionRatio * 100).toFixed(1) + ' %',
+        '预估后备时间: ' + fmt(r.estimatedRunTime) + ' 分钟',
+        '系统总能量: ' + fmt(r.totalEnergyKWh, 2) + ' kWh'
+    ];
+    return lines.join('\n');
+}
+let lastExportInputs = null, lastExportResult = null;
+function renderCopySummary(inputs, r) {
+    lastExportInputs = inputs; lastExportResult = r;
+    lastCopySummary = buildConfigSummary(inputs, r);
+    const el = document.getElementById('configSummaryText');
+    if (el) el.textContent = lastCopySummary;
+}
+function copyConfigSummary() {
+    const text = lastCopySummary || document.getElementById('configSummaryText').textContent;
+    const done = () => {
+        const t = document.getElementById('copyConfigBtnText');
+        if (!t) return;
+        const old = t.textContent;
+        t.textContent = '已复制 ✓';
+        setTimeout(() => { t.textContent = old; }, 1500);
+    };
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(text).then(done).catch(() => fallbackCopy(text, done));
+    } else {
+        fallbackCopy(text, done);
+    }
+}
+function fallbackCopy(text, done) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.top = '-9999px';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); done(); } catch (e) { console.error(e); }
+    document.body.removeChild(ta);
+}
+document.getElementById('copyConfigBtn').addEventListener('click', copyConfigSummary);
+function exportConfigTable() {
+    if (!lastExportInputs || !lastExportResult) return;
+    const inputs = lastExportInputs;
+    const r = lastExportResult;
+    const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
+    const modelLabel = model ? (inputs.batteryModelId + ' (' + model.specs.label + ')') : inputs.batteryModelId;
+    const temp = inputs.temperature;
+    const upsLabel = fmt(inputs.upsRatingKva, 0) + 'KVA UPS';
+    const rows = [
+        { label: '电池型号', value: modelLabel, highlight: false },
+        { label: '系统工作电压', value: fmt(inputs.systemVoltage, 1) + ' V', highlight: false },
+        { label: '单节电芯截止电压 (EPV)', value: inputs.epv + ' V', highlight: false },
+        { label: '单节电池截止电压 (EPV×8)', value: (inputs.epv * 8).toFixed(2) + ' V', highlight: false },
+        { label: '单组电芯总节数', value: inputs.cellsPerString + ' 节', highlight: false },
+        { label: '单组电池块数', value: r.blocksPerGroup + ' 块', highlight: false },
+        { label: '配置电池组数', value: inputs.numberOfStrings + ' 组', highlight: false },
+        { label: '电池总数量', value: r.totalQuantity + ' 块', highlight: true },
+        { label: '配置标称电压', value: fmt(r.configNominalVoltage, 1) + ' V', highlight: false },
+        { label: '配置浮充电压 (' + temp + '℃)', value: fmt(r.configFloatVoltage, 1) + ' V', highlight: false },
+        { label: '放电下限电压', value: fmt(r.voltageValidation.batteryDischargeLower, 1) + ' V', highlight: false },
+        { label: '充电上限电压 (' + temp + '℃)', value: fmt(r.voltageValidation.batteryChargeUpper, 1) + ' V', highlight: false },
+        { label: '要求备电时间', value: formatBackupTimeLabel(backupTimeMin), highlight: false },
+        { label: '电池总功率需求', value: fmt(r.totalRequiredPower, 0) + ' W', highlight: true },
+        { label: '单组可提供总功率', value: fmt(r.totalPowerPerString, 1) + ' W', highlight: true },
+        { label: '配置总功率', value: fmt(r.totalProposedPower, 0) + ' W', highlight: true },
+        { label: '电池最大放电电流', value: fmt(r.maxCurrent, 1) + ' A', highlight: true },
+        { label: '单组最大电流', value: fmt(r.maxCurrentPerString, 1) + ' A', highlight: true },
+        { label: '容量满足率', value: (r.satisfactionRatio * 100).toFixed(1) + ' %', highlight: true },
+        { label: '系统总能量', value: fmt(r.totalEnergyKWh, 2) + ' kWh', highlight: false },
+    ];
+    const rowsHtml = rows.map(row => {
+        const style = row.highlight
+            ? 'background:#fff3cd; color:#7c5200; font-weight:600;'
+            : 'background:#ffffff; color:#1a1a1a;';
+        return `<tr><td style="padding:9px 16px;border:1px solid #d0d7de;font-size:13px;color:#444;background:#f6f8fa;font-weight:500;width:220px;">${row.label}</td><td style="padding:9px 16px;border:1px solid #d0d7de;font-size:13px;${style}">${row.value}</td></tr>`;
+    }).join('');
+    const tableHtml = `<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="UTF-8">
+<title>电池配置方案 — ${upsLabel}</title>
+<style>
+  body { font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif; background:#f0f2f5; display:flex; justify-content:center; padding:40px 20px; }
+  .wrapper { background:#fff; border-radius:10px; box-shadow:0 2px 16px rgba(0,0,0,0.10); overflow:hidden; max-width:600px; width:100%; }
+  table { border-collapse:collapse; width:100%; }
+  .header-row th { background:#1d4ed8; color:#fff; font-size:14px; font-weight:700; padding:13px 16px; text-align:left; border:1px solid #1d4ed8; }
+  @media print { body { background:white; padding:0; } .wrapper { box-shadow:none; } }
+</style>
+</head><body><div class="wrapper"><table>
+<thead><tr class="header-row"><th>项目</th><th>${upsLabel}</th></tr></thead>
+<tbody>${rowsHtml}</tbody>
+</table></div></body></html>`;
+    const blob = new Blob([tableHtml], { type: 'text/html;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
+    a.download = '电池配置方案_' + inputs.batteryModelId + '_' + ts + '.html';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
+}
+document.getElementById('exportTableBtn').addEventListener('click', exportConfigTable);
+
+
+// ══════════════════════════════════════════════════════════════════
+// MAIN RECALCULATE
+// ══════════════════════════════════════════════════════════════════
+function recalculate() {
+    const inputs = {
+        batteryModelId: document.getElementById('batteryModel').value,
+        upsRatingKva: parseFloat(document.getElementById('upsRatingKva').value) || 0,
+        systemVoltage: parseFloat(document.getElementById('systemVoltage').value) || 0,
+        powerFactor: parseFloat(document.getElementById('powerFactor').value) || 0,
+        inverterEfficiency: parseFloat(document.getElementById('inverterEfficiency').value) || 0,
+        agingFactor: parseFloat(document.getElementById('agingFactor').value) || 1,
+        designMargin: parseFloat(document.getElementById('designMargin').value) || 1,
+        epv: parseFloat(document.getElementById('epv').value) || 0,
+        backupTimeMin: backupTimeMin,
+        cellsPerString: parseInt(document.getElementById('cellsPerString').value) || 0,
+        numberOfStrings: parseInt(document.getElementById('numberOfStrings').value) || 0,
+        temperature: parseFloat(document.getElementById('temperature').value) || 25,
+        voltageRangePercent: parseFloat(document.getElementById('voltageRangePercent').value) || 20,
+        upsVoltageLower: parseFloat(document.getElementById('vvUpsLower').value),
+        upsVoltageUpper: parseFloat(document.getElementById('vvUpsUpper').value),
+        requiredPowerMode: requiredPowerMode,
+        manualRequiredPower: parseFloat(document.getElementById('requiredPowerInput').value)
+    };
+
+    // 单组电池块数：直接读输入框（与节数已双向同步），异常时回退 ⌈节数/8⌉
+    const blocksEl = document.getElementById('blocksPerGroupDisplay');
+    inputs.blocksPerGroup = parseInt(blocksEl.value) || Math.ceil((inputs.cellsPerString || 0) / 8);
+
+    // 单节电池截止电压 = EPV × 8 (始终更新)
+    const epvBatteryDisplay = document.getElementById('batteryEpvDisplay');
+    if (epvBatteryDisplay) epvBatteryDisplay.textContent = (inputs.epv * 8).toFixed(2);
+
+    if (inputs.cellsPerString <= 0) return;
+    if (requiredPowerMode === 'auto' && inputs.upsRatingKva <= 0) return;
+    if (requiredPowerMode === 'manual' && !(inputs.manualRequiredPower > 0)) {
+        document.getElementById('statRequiredPower').innerHTML = '—<span class="stat-unit ml-1.5">W</span>';
+        document.getElementById('requiredPowerHint').textContent = '请输入有效的电池总功率需求 (W)';
+        return;
+    }
+
+    let r;
+    try { r = calculate(inputs); } catch(e) { console.error(e); return; }
+
+    const vv = r.voltageValidation;
+    const bothOk = vv.dischargeInRange && vv.chargeInRange;
+
+    // ── Voltage Panel ──
+    const panel = document.getElementById('voltagePanel');
+    panel.className = `vpanel ${bothOk ? 'vpanel-ok' : 'vpanel-bad'}`;
+    document.getElementById('voltagePanelIcon').setAttribute('data-lucide', bothOk ? 'shield-check' : 'alert-triangle');
+    document.getElementById('voltagePanelIcon').className = `h-5 w-5 ${bothOk ? 'text-ok' : 'text-bad'}`;
+    document.getElementById('voltagePanelTitle').className = `text-sm font-bold ${bothOk ? 'text-ok' : 'text-bad'}`;
+    const badge = document.getElementById('voltagePanelBadge');
+    badge.className = `badge ml-auto ${bothOk ? 'badge-ok' : 'badge-bad'}`;
+    badge.textContent = bothOk ? '✓ 匹配 MATCHED' : '✗ 超出范围 OUT OF RANGE';
+
+    const upsLowerInput = document.getElementById('vvUpsLower');
+    const upsUpperInput = document.getElementById('vvUpsUpper');
+    if (document.activeElement !== upsLowerInput) upsLowerInput.value = fmt(vv.upsVoltageLower, 1);
+    if (document.activeElement !== upsUpperInput) upsUpperInput.value = fmt(vv.upsVoltageUpper, 1);
+
+    // Discharge check
+    const dBadge = document.getElementById('vvDischargeBadge');
+    dBadge.textContent = vv.dischargeInRange ? '✓' : '✗';
+    dBadge.className = `badge ${vv.dischargeInRange ? 'badge-ok' : 'badge-bad'}`;
+    const dVal = document.getElementById('vvDischargeLower');
+    dVal.textContent = fmt(vv.batteryDischargeLower, 1) + ' V';
+    dVal.className = `font-mono text-sm font-bold ${vv.dischargeInRange ? 'text-ok' : 'text-bad'}`;
+    const dWarn = document.getElementById('vvDischargeWarn');
+    if (!vv.dischargeInRange) { dWarn.textContent = '< UPS 下限 ' + fmt(vv.upsVoltageLower,1) + 'V'; dWarn.classList.remove('hidden'); }
+    else { dWarn.classList.add('hidden'); }
+
+    // Charge check
+    const cBadge = document.getElementById('vvChargeBadge');
+    cBadge.textContent = vv.chargeInRange ? '✓' : '✗';
+    cBadge.className = `badge ${vv.chargeInRange ? 'badge-ok' : 'badge-bad'}`;
+    const cVal = document.getElementById('vvChargeUpper');
+    cVal.textContent = fmt(vv.batteryChargeUpper, 1) + ' V';
+    cVal.className = `font-mono text-sm font-bold ${vv.chargeInRange ? 'text-ok' : 'text-bad'}`;
+    const cWarn = document.getElementById('vvChargeWarn');
+    if (!vv.chargeInRange) { cWarn.textContent = '> UPS 上限 ' + fmt(vv.upsVoltageUpper,1) + 'V'; cWarn.classList.remove('hidden'); }
+    else { cWarn.classList.add('hidden'); }
+
+    lucide.createIcons();
+
+    // ── Hero Metrics ──
+    const heroSat = document.getElementById('heroSatisfaction');
+    heroSat.className = `hero-card ${r.satisfactionRatio >= 1 ? 'hero-ok' : 'hero-bad'}`;
+    document.getElementById('heroSatisfactionValue').innerHTML = (r.satisfactionRatio * 100).toFixed(1) + '<span class="ml-1 text-lg">%</span>';
+    document.getElementById('heroRunTime').textContent = fmt(r.estimatedRunTime);
+    document.getElementById('heroWeight').textContent = fmt(r.totalWeight);
+
+    // ── 电池总功率需求（自动/手动联动）──
+    lastAutoRequiredPower = r.autoRequiredPower;
+    const reqInput = document.getElementById('requiredPowerInput');
+    const reqHint = document.getElementById('requiredPowerHint');
+    document.getElementById('statRequiredPower').innerHTML = fmt(r.totalRequiredPower) + '<span class="stat-unit ml-1.5">W</span>';
+    if (requiredPowerMode === 'auto') {
+        if (document.activeElement !== reqInput) reqInput.value = Math.round(r.totalRequiredPower);
+        reqHint.textContent = 'UPS ' + fmt(inputs.upsRatingKva, 0) + 'kVA × PF ' + inputs.powerFactor + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' ÷ 老化 ' + inputs.agingFactor + ' × 余量 ' + inputs.designMargin + ' = ' + fmt(r.totalRequiredPower) + ' W';
+    } else {
+        const diff = r.totalRequiredPower - r.autoRequiredPower;
+        reqHint.innerHTML = '手动指定；自动计算值 ' + fmt(r.autoRequiredPower) + ' W（差 ' + (diff >= 0 ? '+' : '') + fmt(diff) + ' W）';
+    }
+
+    // ── Stat Cards ──
+    document.getElementById('statWattPerCell').innerHTML = fmt(r.wattPerCellLookup) + '<span class="stat-unit ml-1.5">W/cell</span>';
+    document.getElementById('statPowerPerUnit').innerHTML = fmt(r.powerPerUnit) + '<span class="stat-unit ml-1.5">W</span>';
+    document.getElementById('statPowerPerString').innerHTML = fmt(r.totalPowerPerString) + '<span class="stat-unit ml-1.5">W</span>';
+    document.getElementById('statMaxCurrent').innerHTML = fmt(r.maxCurrent) + '<span class="stat-unit ml-1.5">A</span>';
+    document.getElementById('statMaxCurrentPerString').innerHTML = fmt(r.maxCurrentPerString) + '<span class="stat-unit ml-1.5">A</span>';
+    document.getElementById('statNominalVoltage').innerHTML = fmt(r.configNominalVoltage, 1) + '<span class="stat-unit ml-1.5">V</span>';
+    document.getElementById('statFloatVoltage').innerHTML = fmt(r.configFloatVoltage, 1) + '<span class="stat-unit ml-1.5">V</span>';
+    // Live formula hints
+    const sh = (id,t) => { const e=document.getElementById(id); if(e) e.textContent=t; };
+    sh('hintWattPerCell',
+        'EPV '+r.matchedEpvKey+'V × '+r.matchedTime+'min 查得 = '+fmt(r.wattPerCellLookup,1)+' W/cell');
+    sh('hintPowerPerUnit',
+        fmt(r.wattPerCellLookup,1)+' W/cell × 8芯/块 = '+fmt(r.powerPerUnit,1)+' W/块');
+    sh('hintPowerPerString',
+        fmt(r.wattPerCellLookup,1)+' × '+inputs.cellsPerString+'节 = '+fmt(r.totalPowerPerString,1)+' W');
+    sh('hintMaxCurrent',
+        fmt(r.totalRequiredPower,0)+' W ÷ ('+inputs.epv+'V × '+inputs.cellsPerString+'节) = '+fmt(r.maxCurrent,1)+' A');
+    sh('hintMaxCurrentPerString',
+        fmt(r.maxCurrent,1)+' A ÷ '+inputs.numberOfStrings+'组 = '+fmt(r.maxCurrentPerString,1)+' A/组');
+    sh('hintNominalVoltage',
+        '13.2V × '+r.blocksPerGroup+'块 = '+fmt(r.configNominalVoltage,1)+' V');
+    sh('hintFloatVoltage',
+        '('+fmt(r.temperatureCoefficient,3)+' −0.05) × '+inputs.cellsPerString+'节 = '+fmt(r.configFloatVoltage,1)+' V');
+
+    // ── Config Details ──
+    document.getElementById('configDetails').innerHTML = [
+        detailRow('查表 EPV 档位', r.matchedEpvKey + ' V'),
+        detailRow('查表时间点', r.matchedTime + ' min'),
+        detailRow('单组电池块数', r.blocksPerGroup + ' blocks (节数 = ' + (r.blocksPerGroup * 8) + ')'),
+        detailRow('配置总功率', fmt(r.totalProposedPower) + ' W'),
+        detailRow('配置标称电压 (13.2V×块数)', fmt(r.configNominalVoltage, 1) + ' V'),
+        detailRow('配置浮充电压 (TCV−0.05)V×节数', fmt(r.configFloatVoltage, 1) + ' V'),
+        detailRow('单电池尺寸 (L×W×H)', r.unitLength + ' × ' + r.unitWidth + ' × ' + r.unitHeight + ' m'),
+        detailRow('电池总体积', fmt(r.totalVolume, 4) + ' m³'),
+        detailRow('电池总数量', r.unitsPerString + ' × ' + inputs.numberOfStrings + ' = ' + r.totalQuantity + ' blocks'),
+        detailRow('电池总重量 Total Weight', fmt(r.totalWeight, 1) + ' kg'),
+        detailRow('系统总能量 Total Energy', fmt(r.totalEnergyKWh, 2) + ' kWh'),
+        detailRow('温度系数 TCV', fmt(r.temperatureCoefficient, 4) + ' (' + inputs.temperature + '℃)')
+    ].join('');
+
+    document.getElementById('tcvDisplay').textContent = fmt(r.temperatureCoefficient, 4);
+
+    // ── Current Config Copy Summary ──
+    renderCopySummary(inputs, r);
+
+    // ── Discharge Tables ──
+    let tablesHtml = '';
+    BATTERY_MODELS.forEach(m => {
+        tablesHtml += renderDischargeTable(m.id, inputs.epv, backupTimeMin);
+    });
+    document.getElementById('dischargeTables').innerHTML = tablesHtml;
+
+    lucide.createIcons();
+
+    // ── Capacity panel & steps (always update, mode-render decides visibility) ──
+    let capResult = null;
+    try {
+        capResult = calculateCapacity(inputs);
+        if (calcMode === 'capacity') renderCapacityPanel(inputs, capResult);
+    } catch(e) { console.error('cap calc error', e); }
+
+    renderCalcSteps(inputs, r, capResult);
+    updateModeRecommend();
+}
+
+function detailRow(label, value) {
+    return `<div class="flex items-center justify-between"><span class="text-ink3">${label}</span><span class="font-medium text-ink">${value}</span></div>`;
+}
+
+
+// ══════════════════════════════════════════════════════════════════
+// CAPACITY ENGINE
+// ══════════════════════════════════════════════════════════════════
+function calculateCapacity(inputs) {
+    const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
+    if (!model) throw new Error('Unknown model');
+    const { specs } = model;
+
+    // Step 1: total required battery power
+    const totalRequiredPower =
+        (inputs.requiredPowerMode === 'manual' && inputs.manualRequiredPower > 0)
+            ? inputs.manualRequiredPower
+            : (inputs.upsRatingKva * 1000 * inputs.powerFactor)
+              / inputs.inverterEfficiency
+              / (inputs.agingFactor  || 1)
+              * (inputs.designMargin || 1);
+
+    // Step 2: total energy required
+    const backupTimeH   = inputs.backupTimeMin / 60;
+    const requiredWh    = totalRequiredPower * backupTimeH;
+
+    // Step 3: string nominal voltage = 13.2 V × blocks per group
+    const blocksPerGroup      = inputs.blocksPerGroup ||
+        Math.ceil(inputs.cellsPerString / specs.cellsPerUnit);
+    const stringNominalVoltage = specs.ratedVoltage * blocksPerGroup; // 13.2×blocks
+
+    // Required Ah per string  = Wh ÷ Vstring ÷ #strings
+    const requiredAhPerString  = requiredWh / stringNominalVoltage / (inputs.numberOfStrings || 1);
+    const requiredAhTotal      = requiredAhPerString * (inputs.numberOfStrings || 1);
+
+    // Step 4: provided Ah
+    const providedAhPerString  = specs.ratedCapacityAh;   // e.g. 90 Ah — series chain keeps Ah
+    const providedAhTotal      = providedAhPerString * (inputs.numberOfStrings || 1);
+
+    const capSatisfactionRatio = providedAhPerString / requiredAhPerString;
+    const estimatedRunTimeMin  = inputs.backupTimeMin * capSatisfactionRatio;
+
+    // Current
+    const maxCurrent           = totalRequiredPower / stringNominalVoltage;
+    const maxCurrentPerString  = maxCurrent / (inputs.numberOfStrings || 1);
+
+    // Total energy & weight
+    const totalQuantity   = blocksPerGroup * (inputs.numberOfStrings || 1);
+    const totalEnergyKWh  = (specs.ratedVoltage * specs.ratedCapacityAh * totalQuantity) / 1000;
+    const totalWeight     = totalQuantity * specs.weightKg;
+
+    return {
+        totalRequiredPower, backupTimeH, requiredWh,
+        stringNominalVoltage, blocksPerGroup,
+        requiredAhPerString, requiredAhTotal,
+        providedAhPerString, providedAhTotal,
+        capSatisfactionRatio, estimatedRunTimeMin,
+        maxCurrent, maxCurrentPerString,
+        totalEnergyKWh, totalWeight, totalQuantity
+    };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CAPACITY PANEL RENDERER
+// ══════════════════════════════════════════════════════════════════
+function renderCapacityPanel(inputs, cr) {
+    const sat     = cr.capSatisfactionRatio;
+    const satPct  = (sat * 100).toFixed(1);
+    const ok      = sat >= 1;
+
+    const html = `
+    <!-- Hero row -->
+    <div class="hero-grid grid grid-cols-3 gap-3 mb-3">
+        <div class="hero-card ${ok ? 'hero-ok' : 'hero-bad'}">
+            <p class="hero-label">容量满足率</p>
+            <p class="hero-value">${satPct}<span class="ml-1 text-lg">%</span></p>
+            <p class="hero-unit">Capacity Satisfaction</p>
+        </div>
+        <div class="hero-card hero-info">
+            <p class="hero-label">预估后备时间</p>
+            <p class="hero-value">${fmt(cr.estimatedRunTimeMin)}</p>
+            <p class="hero-unit">mins</p>
+        </div>
+        <div class="hero-card hero-neutral hero-span-rest">
+            <p class="hero-label">系统总重</p>
+            <p class="hero-value">${fmt(cr.totalWeight)}</p>
+            <p class="hero-unit">kg</p>
+        </div>
+    </div>
+    <!-- Stat grid -->
+    <div class="stat-grid grid grid-cols-2 gap-3">
+        ${capCard('database','需求总能量',fmt(cr.requiredWh,0),'Wh',fmt(cr.totalRequiredPower,0)+' W × '+fmt(inputs.backupTimeMin/60,2)+' h = '+fmt(cr.requiredWh,0)+' Wh')}
+        ${capCard('battery','每块需求容量',fmt(cr.requiredAhPerString,1),'Ah',fmt(cr.requiredWh,0)+' ÷ '+fmt(cr.stringNominalVoltage,1)+'V ÷ '+inputs.numberOfStrings+'组 = '+fmt(cr.requiredAhPerString,1)+' Ah')}
+        ${capCard('battery-full','配置提供容量（每块）',fmt(cr.providedAhPerString,0),'Ah',inputs.batteryModelId+' 额定 = '+fmt(cr.providedAhPerString,0)+' Ah/块')}
+        ${capCard('layers','配置提供总容量',fmt(cr.providedAhTotal,1),'Ah',fmt(cr.providedAhPerString,0)+' Ah × '+inputs.numberOfStrings+'组 = '+fmt(cr.providedAhTotal,1)+' Ah')}
+        ${capCard('zap','电池总功率需求',fmt(cr.totalRequiredPower,0),'W',fmt(inputs.upsRatingKva,0)+' kVA ×'+inputs.powerFactor+'×1000÷'+inputs.inverterEfficiency+' = '+fmt(cr.totalRequiredPower,0)+' W')}
+        ${capCard('git-branch','串联电压',fmt(cr.stringNominalVoltage,1),'V','13.2V × '+cr.blocksPerGroup+'块 = '+fmt(cr.stringNominalVoltage,1)+' V')}
+        ${capCard('trending-up','最大放电电流',fmt(cr.maxCurrent,1),'A',fmt(cr.totalRequiredPower,0)+' W ÷ '+fmt(cr.stringNominalVoltage,1)+'V = '+fmt(cr.maxCurrent,1)+' A')}
+        ${capCard('activity','单组最大电流',fmt(cr.maxCurrentPerString,1),'A',fmt(cr.maxCurrent,1)+' A ÷ '+inputs.numberOfStrings+'组 = '+fmt(cr.maxCurrentPerString,1)+' A')}
+    </div>
+    <!-- Energy summary -->
+    <div class="mt-3 rounded-xl p-4" style="border:1px solid rgb(var(--c-ok)/0.3); background:rgb(var(--c-ok)/0.08)">
+        <p class="stat-title mb-2" style="color:rgb(var(--c-ok))">系统总能量</p>
+        <p class="text-3xl font-black text-ink">${fmt(cr.totalEnergyKWh,2)} <span class="text-sm font-medium" style="color:rgb(var(--c-ok))">kWh</span></p>
+        <p class="text-[10px] text-ink3 mt-1">${cr.totalQuantity} 块 × ${fmt(inputs.batteryModelId === '8XNFG90' ? 17.3 : 7.8,1)} kg · 共 ${fmt(cr.totalWeight,1)} kg</p>
+    </div>
+    `;
+    document.getElementById('capResultsPanel').innerHTML = html;
+    lucide.createIcons();
+}
+function capCard(icon, label, val, unit, hint) {
+    return `<div class="stat-card">
+        <div class="mb-2 flex items-center gap-2">
+            <i data-lucide="${icon}" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>
+            <span class="stat-title">${label}</span>
+        </div>
+        <p class="stat-value">${val}<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">${unit}</span></p>
+        <p class="stat-hint">${hint}</p>
+    </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CALCULATION STEPS RENDERER
+// ══════════════════════════════════════════════════════════════════
+function renderCalcSteps(inputs, r, cr) {
+    const isPower = (calcMode === 'power');
+    const el = document.getElementById('calcStepsContent');
+    const title = document.getElementById('stepsTitle');
+    const icon  = document.getElementById('stepsIcon');
+    if (!el) return;
+
+    if (isPower && r) {
+        title.textContent = '计算步骤详解 (功率验证模式)';
+        icon.textContent  = '⚡';
+        const pf  = inputs.powerFactor;
+        const eff = inputs.inverterEfficiency;
+        const kva = inputs.upsRatingKva;
+        const dm  = inputs.designMargin;
+        const af  = inputs.agingFactor;
+        const np  = r.totalRequiredPower;
+        const wpc = r.wattPerCellLookup;
+        const bpg = r.blocksPerGroup;
+        const cps = inputs.cellsPerString;
+        const ns  = inputs.numberOfStrings;
+        el.innerHTML = [
+            powerStep('Step 1', '计算电池组总功率需求',
+                `${kva} kVA × ${pf} × 1000 ÷ ${eff}(逆变效率) ÷ ${af}(老化) × ${dm}(余量)`,
+                `= <b>${fmt(np,1)} W</b>`),
+            powerStep('Step 2', '算单节电芯需要的放电功率 (W/Cell)',
+                `${fmt(np,1)} W ÷ ${cps} 节`,
+                `= <b>${fmt(np/cps,2)} W/Cell</b>`),
+            powerStep('Step 3', `查恒功率放电表 (EPV=${r.matchedEpvKey}V, ${r.matchedTime}min)`,
+                `电池型号 ${inputs.batteryModelId} → 查表值`,
+                `= <b>${fmt(wpc,1)} W/Cell</b>`),
+            powerStep('Step 4', '单组可提供的总功率',
+                `${fmt(wpc,1)} W/Cell × ${cps} 节`,
+                `= <b>${fmt(r.totalPowerPerString,1)} W / 组</b>`),
+            powerStep('Step 5', '配置总功率 & 容量满足率',
+                `${fmt(r.totalPowerPerString,1)} × ${ns} 组 = ${fmt(r.totalProposedPower,0)} W`,
+                `满足率 = ${fmt(r.totalProposedPower,0)} ÷ ${fmt(np,0)} = <b>${(r.satisfactionRatio*100).toFixed(1)}%</b>`),
+            powerStep('Step 6', '最大放电电流',
+                `${fmt(np,0)} W ÷ (${inputs.epv}V × ${cps} 节)`,
+                `= <b>${fmt(r.maxCurrent,1)} A</b> 总 / <b>${fmt(r.maxCurrentPerString,1)} A</b> 每组`)
+        ].join('');
+    } else if (!isPower && cr) {
+        title.textContent = '计算步骤详解 (容量验证模式)';
+        icon.textContent  = '🔋';
+        const bth = cr.backupTimeH;
+        const rWh = cr.requiredWh;
+        const vStr = cr.stringNominalVoltage;
+        const rAh = cr.requiredAhPerString;
+        const pAh = cr.providedAhPerString;
+        el.innerHTML = [
+            capStep('Step 1', '计算电池组总功率需求',
+                `${inputs.upsRatingKva}kVA × ${inputs.powerFactor} × 1000 ÷ ${inputs.inverterEfficiency}`,
+                `= <b>${fmt(cr.totalRequiredPower,1)} W</b>`),
+            capStep('Step 2', '计算所需总能量',
+                `${fmt(cr.totalRequiredPower,1)} W × ${bth.toFixed(4)} h (${inputs.backupTimeMin}min)`,
+                `= <b>${fmt(rWh,1)} Wh</b>`),
+            capStep('Step 3', '计算串联电压',
+                `13.2 V × ${cr.blocksPerGroup} 块/组`,
+                `= <b>${fmt(vStr,1)} V</b>`),
+            capStep('Step 4', '计算每串所需容量',
+                `${fmt(rWh,1)} Wh ÷ ${fmt(vStr,1)} V ÷ ${inputs.numberOfStrings} 组`,
+                `= <b>${fmt(rAh,2)} Ah / 串</b>`),
+            capStep('Step 5', '对比额定容量 & 满足率',
+                `配置额定 ${pAh} Ah ÷ 需求 ${fmt(rAh,2)} Ah`,
+                `满足率 = <b>${(cr.capSatisfactionRatio*100).toFixed(1)}%</b>`),
+            capStep('Step 6', '预估可支撑时间',
+                `${inputs.backupTimeMin} min × ${(cr.capSatisfactionRatio).toFixed(4)}`,
+                `= <b>${fmt(cr.estimatedRunTimeMin,1)} min</b>`)
+        ].join('');
+    }
+}
+function powerStep(lbl,title,formula,result) {
+    return `<div class="step-box power-step"><div class="step-label">${lbl} — ${title}</div>
+    <div class="step-formula">${formula}</div><div class="step-result">${result}</div></div>`;
+}
+function capStep(lbl,title,formula,result) {
+    return `<div class="step-box cap-step"><div class="step-label">${lbl} — ${title}</div>
+    <div class="step-formula">${formula}</div><div class="step-result">${result}</div></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// MODE CONTROLLER
+// ══════════════════════════════════════════════════════════════════
+let calcMode = 'power'; // 'power' | 'capacity'
+
+function setCalcMode(mode) {
+    calcMode = mode;
+    const isPower = mode === 'power';
+
+    // Tab styles
+    document.getElementById('tabPower').className =
+        'mode-tab ' + (isPower ? 'active-power' : '') + ' rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2';
+    document.getElementById('tabCapacity').className =
+        'mode-tab ' + (!isPower ? 'active-capacity' : '') + ' rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2';
+
+    // Show/hide power-only block
+    const pwBlock = document.getElementById('pwOnlyBlock');
+    if (pwBlock) pwBlock.style.display = isPower ? '' : 'none';
+    // Voltage panel — always visible in both modes
+    // (no hide)
+    // Capacity panel
+    const cp = document.getElementById('capResultsPanel');
+    if (cp) cp.style.display = isPower ? 'none' : '';
+
+    // Left column: discharge table area already in pwOnlyBlock; nothing extra needed
+    recalculate();
+}
+
+document.getElementById('tabPower').addEventListener('click', () => setCalcMode('power'));
+document.getElementById('tabCapacity').addEventListener('click', () => setCalcMode('capacity'));
+
+// ── Recommend hint based on backup time ──
+function updateModeRecommend() {
+    const el = document.getElementById('modeRecommend');
+    const tip = document.getElementById('modeTooltip');
+    if (!el) return;
+    const t = backupTimeMin;
+    if (t <= 15) {
+        el.textContent = '⚡ 推荐：功率验证模式';
+        el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help badge badge-acc';
+        if (tip) tip.innerHTML = '<b>为什么选功率模式？</b><br>备电≤15min 放电电流大，须查恒功率表确认实际可输出功率 ≥ 需求功率。';
+    } else if (t <= 29) {
+        el.textContent = '⚠️ 过渡区：两种模式均可';
+        el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help badge badge-warn';
+        if (tip) tip.innerHTML = '<b>15～30 min 过渡区</b><br>功率与容量验证结果相近，建议两种模式对照确认。';
+    } else {
+        el.textContent = '🔋 推荐：容量验证模式';
+        el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help badge badge-ok';
+        if (tip) tip.innerHTML = '<b>为什么选容量模式？</b><br>备电≥30min 放电电流小，容量接近额定值，用 Ah 验证更直接。';
+    }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SAVED CONFIGURATIONS (localStorage + in-memory fallback)
+// ══════════════════════════════════════════════════════════════════
+const CONFIG_FIELD_IDS = ['batteryModel','upsRatingKva','systemVoltage','powerFactor','inverterEfficiency','epv','cellsPerString','numberOfStrings','blocksPerGroupDisplay','designMargin','agingFactor','temperature','voltageRangePercent','vvUpsLower','vvUpsUpper','requiredPowerInput'];
+const SAVED_CONFIGS_KEY = 'nizn_saved_configs_v1';
+let memoryConfigs = null;
+
+function loadSavedConfigs() {
+    if (memoryConfigs) return memoryConfigs;
+    try { memoryConfigs = JSON.parse(localStorage.getItem(SAVED_CONFIGS_KEY)) || []; }
+    catch (e) { memoryConfigs = []; }
+    return memoryConfigs;
+}
+function persistSavedConfigs(list) {
+    memoryConfigs = list;
+    try { localStorage.setItem(SAVED_CONFIGS_KEY, JSON.stringify(list)); } catch (e) {}
+}
+function captureCurrentConfig() {
+    const values = {};
+    CONFIG_FIELD_IDS.forEach(id => { values[id] = document.getElementById(id).value; });
+    values.backupTimeMin = backupTimeMin;
+    values.requiredPowerMode = requiredPowerMode;
+    return values;
+}
+function saveCurrentConfig() {
+    const values = captureCurrentConfig();
+    const kva = parseFloat(values.upsRatingKva) || 0;
+    const list = loadSavedConfigs();
+    list.unshift({ id: 'cfg_' + Date.now(), name: kva + ' kVA', savedAt: new Date().toISOString(), values: values });
+    persistSavedConfigs(list);
+    renderSavedConfigs();
+}
+function deleteSavedConfig(id) {
+    persistSavedConfigs(loadSavedConfigs().filter(c => c.id !== id));
+    renderSavedConfigs();
+}
+function applySavedConfig(id) {
+    const config = loadSavedConfigs().find(c => c.id === id);
+    if (!config) return;
+    const v = config.values;
+    CONFIG_FIELD_IDS.forEach(fid => {
+        if (v[fid] !== undefined && document.getElementById(fid)) document.getElementById(fid).value = v[fid];
+    });
+    if (v.backupTimeMin !== undefined) {
+        backupTimeMin = parseFloat(v.backupTimeMin);
+        document.querySelectorAll('#backupTimeButtons .btn-time').forEach(b => {
+            b.classList.toggle('active', parseFloat(b.dataset.time) === backupTimeMin);
+        });
+        document.getElementById('currentBackupTime').textContent = formatBackupTimeLabel(backupTimeMin);
+        document.getElementById('backupTimeInput').value = backupTimeMin;
+    }
+    document.getElementById('autoCellsDisplay').textContent = document.getElementById('cellsPerString').value;
+    applyPowerModeUI(v.requiredPowerMode === 'manual' ? 'manual' : 'auto');
+    recalculate();
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+function renderSavedConfigs() {
+    const list = loadSavedConfigs();
+    const container = document.getElementById('savedConfigsList');
+    const empty = document.getElementById('savedConfigsEmpty');
+    if (!list.length) { container.innerHTML = ''; empty.style.display = 'block'; return; }
+    empty.style.display = 'none';
+    container.innerHTML = list.map(c => {
+        const v = c.values;
+        const dateStr = new Date(c.savedAt).toLocaleString();
+        return `<div data-config-id="${c.id}" class="config-card group">
+            <button type="button" data-delete-id="${c.id}" class="del-btn" title="删除">
+                <i data-lucide="trash-2" class="h-3.5 w-3.5 pointer-events-none"></i>
+            </button>
+            <p class="pr-6 text-base font-bold text-ink">${escapeHtml(c.name)}</p>
+            <p class="mt-0.5 text-[11px] text-ink3">${escapeHtml(v.batteryModel || '')} · ${escapeHtml(v.systemVoltage)}V · ${escapeHtml(v.numberOfStrings)}组 · ${escapeHtml(v.backupTimeMin)}min</p>
+            <p class="mt-1 text-[10px] text-ink3">${escapeHtml(dateStr)}</p>
+        </div>`;
+    }).join('');
+    lucide.createIcons();
+}
+document.getElementById('saveConfigBtn').addEventListener('click', saveCurrentConfig);
+document.getElementById('savedConfigsList').addEventListener('click', function (e) {
+    const delBtn = e.target.closest('[data-delete-id]');
+    if (delBtn) { e.stopPropagation(); deleteSavedConfig(delBtn.dataset.deleteId); return; }
+    const card = e.target.closest('[data-config-id]');
+    if (card) applySavedConfig(card.dataset.configId);
+});
+</script>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   THEME SYSTEM — 6 套主题（CSS 变量驱动 + localStorage 记忆）
+   ══════════════════════════════════════════════════════════════════ */
+const THEMES = [
+    { id: 'dark',   name: '深夜 Dark',   sw: 'linear-gradient(135deg,#0f172a,#475569)' },
+    { id: 'light',  name: '浅色 Light',  sw: 'linear-gradient(135deg,#cbd5e1,#ffffff)' },
+    { id: 'mint',   name: '薄荷 Mint',   sw: 'linear-gradient(135deg,#5eead4,#a7f3d0)' },
+    { id: 'sky',    name: '天空 Sky',    sw: 'linear-gradient(135deg,#38bdf8,#93c5fd)' },
+    { id: 'sand',   name: '暖沙 Sand',   sw: 'linear-gradient(135deg,#d6b98c,#f5e0c0)' },
+    { id: 'sakura', name: '樱花 Sakura', sw: 'linear-gradient(135deg,#f472b6,#fbcfe8)' },
+];
+const THEME_KEY = 'nizn_theme_v2';
+let currentTheme = 'dark';
+try { currentTheme = localStorage.getItem(THEME_KEY) || 'dark'; } catch (e) {}
+
+/** 应用主题：设置 data-theme、更新选择器色卡与标签、记忆到 localStorage */
+function applyTheme(themeId) {
+    currentTheme = THEMES.some(t => t.id === themeId) ? themeId : 'dark';
+    document.documentElement.setAttribute('data-theme', currentTheme);
+    const meta = THEMES.find(t => t.id === currentTheme);
+    const label = document.getElementById('themePickerLabel');
+    const swatch = document.getElementById('themeSwatch');
+    if (label) label.textContent = meta ? meta.name.split(' ')[0] : '主题';
+    if (swatch) swatch.style.background = meta ? meta.sw : '#0f172a';
+    document.querySelectorAll('#themeMenu .theme-item').forEach(el => {
+        el.classList.toggle('current', el.dataset.themeId === currentTheme);
+    });
+    try { localStorage.setItem(THEME_KEY, currentTheme); } catch (e) {}
+}
+/** 渲染主题宫格下拉 */
+function renderThemeMenu() {
+    const menu = document.getElementById('themeMenu');
+    if (!menu) return;
+    menu.innerHTML = THEMES.map(t => `
+        <button type="button" class="theme-item" data-theme-id="${t.id}" role="menuitem">
+            <span class="sw" style="background:${t.sw}"></span>
+            <span>${t.name}</span>
+            <span class="tick">✓</span>
+        </button>`).join('');
+}
+document.getElementById('themePickerBtn').addEventListener('click', function (e) {
+    e.stopPropagation();
+    document.getElementById('themeMenu').classList.toggle('open');
+});
+document.getElementById('themeMenu').addEventListener('click', function (e) {
+    const item = e.target.closest('[data-theme-id]');
+    if (!item) return;
+    applyTheme(item.dataset.themeId);
+    document.getElementById('themeMenu').classList.remove('open');
+});
+document.addEventListener('click', function (e) {
+    if (!e.target.closest('#themePickerWrap')) {
+        document.getElementById('themeMenu')?.classList.remove('open');
+    }
+});
+applyTheme(currentTheme);
+renderThemeMenu();
+
+/* ══════════════════════════════════════════════════════════════════
+   AI SIDEBAR LAYOUT — 开合 / 拖拽调宽 / 移动端抽屉 / 状态记忆
+   ══════════════════════════════════════════════════════════════════ */
+const AI_OPEN_KEY = 'nizn_ai_open_v1';
+const AI_W_KEY = 'nizn_ai_w_v1';
+const appShell = document.getElementById('appShell');
+let aiOpen = true;
+try { aiOpen = localStorage.getItem(AI_OPEN_KEY) !== '0'; } catch (e) {}
+// 窄屏初始收起抽屉，避免遮挡计算界面
+if (window.innerWidth < 1024) aiOpen = false;
+
+/** 切换 AI 侧边栏开合（桌面端压缩左栏 / 移动端抽屉 + 遮罩） */
+function setAiOpen(open) {
+    aiOpen = !!open;
+    appShell.classList.toggle('ai-closed', !aiOpen);
+    document.body.classList.toggle('ai-open', aiOpen);
+    try { localStorage.setItem(AI_OPEN_KEY, aiOpen ? '1' : '0'); } catch (e) {}
+}
+setAiOpen(aiOpen);
+document.getElementById('aiToggleBtn').addEventListener('click', () => setAiOpen(!aiOpen));
+document.getElementById('aiCloseBtn').addEventListener('click', () => setAiOpen(false));
+document.getElementById('aiOverlay').addEventListener('click', () => setAiOpen(false));
+
+// ── 拖拽调宽（360–720px，记忆到 localStorage）──
+(function initAiResize() {
+    const handle = document.getElementById('aiResizeHandle');
+    let dragging = false;
+    handle.addEventListener('mousedown', function (e) {
+        dragging = true;
+        handle.classList.add('dragging');
+        e.preventDefault();
+    });
+    window.addEventListener('mousemove', function (e) {
+        if (!dragging) return;
+        const w = Math.min(720, Math.max(360, window.innerWidth - e.clientX));
+        document.documentElement.style.setProperty('--ai-w', w + 'px');
+    });
+    window.addEventListener('mouseup', function () {
+        if (!dragging) return;
+        dragging = false;
+        handle.classList.remove('dragging');
+        const w = getComputedStyle(document.documentElement).getPropertyValue('--ai-w').trim();
+        try { localStorage.setItem(AI_W_KEY, w); } catch (e) {}
+    });
+    // 恢复记忆宽度
+    try {
+        const saved = parseInt(localStorage.getItem(AI_W_KEY));
+        if (saved >= 360 && saved <= 720) document.documentElement.style.setProperty('--ai-w', saved + 'px');
+    } catch (e) {}
+})();
+
+/* ══════════════════════════════════════════════════════════════════
+   AI SETTINGS — 服务地址 / 密钥 / 模型 / 生成参数（localStorage）
+   ══════════════════════════════════════════════════════════════════ */
+const AI_SETTINGS_KEY = 'nizn_ai_settings_v1';
+const DEFAULT_MODELS = ['deepseek-flash', 'deepseek-v4-pro'];
+const DEFAULT_SETTINGS = {
+    serverUrl: '/api', userKey: '', modelPref: 'flash',
+    modelFlash: 'deepseek-flash', modelPro: 'deepseek-v4-pro',
+    temperature: 0.7, maxTokens: 8192, stream: true,
+    timeoutSec: 120, historyRounds: 8
+};
+let aiSettings = { ...DEFAULT_SETTINGS };
+try {
+    const raw = JSON.parse(localStorage.getItem(AI_SETTINGS_KEY) || '{}');
+    aiSettings = { ...DEFAULT_SETTINGS, ...raw };
+} catch (e) {}
+let modelOptions = [...DEFAULT_MODELS];
+let backendState = { connected: false, hasServerKey: false };
+
+/** 保存设置到 localStorage */
+function saveAiSettings() {
+    try { localStorage.setItem(AI_SETTINGS_KEY, JSON.stringify(aiSettings)); } catch (e) {}
+}
+/** 归一化服务地址（去尾斜杠，空值回退 /api） */
+function normalizeServerUrl() {
+    let u = (aiSettings.serverUrl || '').trim().replace(/\/+$/, '');
+    return u || '/api';
+}
+/** 当前偏好对应的模型 ID */
+function currentModelId() {
+    return aiSettings.modelPref === 'pro' ? aiSettings.modelPro : aiSettings.modelFlash;
+}
+/** 带用户密钥头的基础 fetch */
+function apiFetch(path, opts = {}) {
+    const headers = { ...(opts.headers || {}) };
+    if (aiSettings.userKey) headers['X-User-Api-Key'] = aiSettings.userKey;
+    return fetch(normalizeServerUrl() + path, { ...opts, headers });
+}
+/** 掩码显示个人密钥：sk-****abcd */
+function maskKey(k) {
+    if (!k) return '未配置个人密钥';
+    return k.length > 8 ? k.slice(0, 3) + '****' + k.slice(-4) : '****';
+}
+/** 更新密钥掩码行与提示 */
+function renderKeyMask() {
+    document.getElementById('aiKeyMask').textContent = aiSettings.userKey ? maskKey(aiSettings.userKey) : '未配置个人密钥';
+    document.getElementById('aiKeyMask').style.color = aiSettings.userKey ? 'rgb(var(--c-text))' : 'rgb(var(--c-text-3))';
+}
+/** 更新侧边栏顶部连接状态徽章与引导卡 */
+function renderBackendStatus() {
+    const dot = document.getElementById('aiStatusDot');
+    const txt = document.getElementById('aiStatusText');
+    if (backendState.connected) {
+        dot.style.background = 'rgb(var(--c-ok))';
+        txt.textContent = backendState.hasServerKey ? '后端已连接 · 服务端密钥' : '后端已连接';
+    } else {
+        dot.style.background = 'rgb(var(--c-bad))';
+        txt.textContent = '未连接后端服务';
+    }
+    const guide = document.getElementById('aiGuideCard');
+    const body = document.getElementById('aiGuideBody');
+    const needGuide = !aiSettings.userKey && (!backendState.connected || !backendState.hasServerKey);
+    guide.style.display = needGuide ? '' : 'none';
+    if (!backendState.connected) {
+        body.innerHTML = '当前未连接后端服务（计算功能不受影响）。<br>· 方式一：在项目目录运行 <b>npm install && npm start</b>，然后访问 <b>http://localhost:3000</b>；<br>· 方式二：点击右上角 ⚙ 设置，填入个人 DeepSeek API Key 并改用你的代理地址。';
+    } else if (!backendState.hasServerKey && !aiSettings.userKey) {
+        body.innerHTML = '后端已连接，但服务端未配置密钥。点击右上角 ⚙ 设置，填入你的个人 DeepSeek API Key（仅存本机浏览器）。';
+    }
+}
+/** 检测后端健康状态（GET /api/health） */
+async function checkBackend() {
+    try {
+        const r = await apiFetch('/health', { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        backendState = { connected: !!j.ok, hasServerKey: !!j.hasServerKey };
+    } catch (e) {
+        backendState = { connected: false, hasServerKey: false };
+    }
+    renderBackendStatus();
+    return backendState.connected;
+}
+/** 请求后端模型列表（失败回退内置列表） */
+async function fetchModelList() {
+    try {
+        const r = await apiFetch('/models', { signal: AbortSignal.timeout(6000) });
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        const j = await r.json();
+        const ids = (j.data || []).map(m => m.id).filter(Boolean);
+        if (ids.length) {
+            modelOptions = ids;
+            // 若官方列表包含已知 ID，同步快捷切换映射
+            if (ids.includes('deepseek-flash')) aiSettings.modelFlash = 'deepseek-flash';
+            if (ids.includes('deepseek-v4-pro')) aiSettings.modelPro = 'deepseek-v4-pro';
+        } else { modelOptions = [...DEFAULT_MODELS]; }
+    } catch (e) {
+        modelOptions = [...DEFAULT_MODELS];
+    }
+    renderModelSelect();
+}
+/** 填充模型下拉 */
+function renderModelSelect() {
+    const sel = document.getElementById('aiModelSelect');
+    const cur = currentModelId();
+    sel.innerHTML = modelOptions.map(id => `<option value="${escapeHtml(id)}">${escapeHtml(id)}</option>`).join('');
+    if (modelOptions.includes(cur)) sel.value = cur;
+    else sel.value = aiSettings.modelFlash;
+    document.getElementById('aiCurrentModel').textContent = cur;
+}
+/** 刷新快捷切换胶囊高亮与当前模型名 */
+function renderModelSeg() {
+    document.querySelectorAll('#aiModelSeg [data-pref]').forEach(b => {
+        b.classList.toggle('on', b.dataset.pref === aiSettings.modelPref);
+    });
+    document.getElementById('aiCurrentModel').textContent = currentModelId();
+}
+document.getElementById('aiModelSeg').addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-pref]');
+    if (!btn) return;
+    aiSettings.modelPref = btn.dataset.pref;
+    saveAiSettings();
+    renderModelSeg();
+});
+
+// ── 设置面板开合 ──
+const settingsModal = document.getElementById('aiSettingsModal');
+document.getElementById('aiSettingsBtn').addEventListener('click', () => { settingsModal.style.display = ''; syncSettingsUI(); });
+document.getElementById('aiGuideSettingsBtn').addEventListener('click', () => { settingsModal.style.display = ''; syncSettingsUI(); });
+document.getElementById('aiSettingsCloseBtn').addEventListener('click', () => { settingsModal.style.display = 'none'; });
+
+/** 打开设置面板时，把当前设置回填到控件 */
+function syncSettingsUI() {
+    renderKeyMask();
+    document.getElementById('aiServerUrl').value = aiSettings.serverUrl;
+    document.getElementById('aiTemperature').value = aiSettings.temperature;
+    document.getElementById('aiMaxTokens').value = aiSettings.maxTokens;
+    document.getElementById('aiTimeoutSec').value = aiSettings.timeoutSec;
+    document.getElementById('aiHistoryRounds').value = aiSettings.historyRounds;
+    document.getElementById('aiStreamToggle').checked = !!aiSettings.stream;
+    renderModelSelect();
+    renderBackendStatus();
+    checkBackend().then(ok => { if (ok) fetchModelList(); });
+}
+// ── 密钥编辑（掩码 → 输入 → 保存/取消/清除）──
+document.getElementById('aiKeyEditBtn').addEventListener('click', function () {
+    document.getElementById('aiKeyInput').style.display = '';
+    document.getElementById('aiKeyInput').value = aiSettings.userKey;
+    document.getElementById('aiKeyMaskRow').style.display = 'none';
+    this.style.display = 'none';
+    document.getElementById('aiKeySaveBtn').style.display = '';
+    document.getElementById('aiKeyCancelBtn').style.display = '';
+    document.getElementById('aiKeyInput').focus();
+});
+document.getElementById('aiKeyCancelBtn').addEventListener('click', function () {
+    document.getElementById('aiKeyInput').style.display = 'none';
+    document.getElementById('aiKeyMaskRow').style.display = '';
+    document.getElementById('aiKeyEditBtn').style.display = '';
+    this.style.display = 'none';
+    document.getElementById('aiKeySaveBtn').style.display = 'none';
+});
+document.getElementById('aiKeySaveBtn').addEventListener('click', function () {
+    const v = document.getElementById('aiKeyInput').value.trim();
+    if (!v) { alert('密钥不能为空；如需清除请使用「清除」按钮。'); return; }
+    aiSettings.userKey = v;
+    saveAiSettings();
+    document.getElementById('aiKeyCancelBtn').click();
+    renderKeyMask();
+    setKeyTestResult('个人密钥已保存（仅存于本机浏览器 localStorage）。', 'ok');
+});
+document.getElementById('aiKeyClearBtn').addEventListener('click', function () {
+    aiSettings.userKey = '';
+    document.getElementById('aiKeyInput').value = '';
+    saveAiSettings();
+    renderKeyMask();
+    setKeyTestResult('已清除个人密钥。', '');
+});
+/** 显示测试连接结果 */
+function setKeyTestResult(msg, type) {
+    const el = document.getElementById('aiKeyTestResult');
+    el.textContent = msg;
+    el.style.color = type === 'ok' ? 'rgb(var(--c-ok))' : type === 'bad' ? 'rgb(var(--c-bad))' : 'rgb(var(--c-text-3))';
+}
+// ── 测试连接 ──
+document.getElementById('aiKeyTestBtn').addEventListener('click', async function () {
+    const btn = this;
+    btn.disabled = true;
+    setKeyTestResult('测试中…', '');
+    try {
+        const r = await apiFetch('/models', { signal: AbortSignal.timeout(8000) });
+        if (r.status === 401) { setKeyTestResult('密钥无效（401）：请检查 API Key 是否正确。', 'bad'); return; }
+        if (!r.ok) { setKeyTestResult('后端返回 HTTP ' + r.status + '，请检查服务地址。', 'bad'); return; }
+        const j = await r.json();
+        const n = (j.data || []).length;
+        setKeyTestResult(`连接成功 ✓ 共发现 ${n} 个可用模型。`, 'ok');
+        fetchModelList();
+    } catch (e) {
+        setKeyTestResult('无法连接后端服务：请确认已 npm start 启动，且服务地址正确（勿直连 api.deepseek.com，官方端点不支持浏览器跨域）。', 'bad');
+    } finally {
+        btn.disabled = false;
+    }
+});
+// ── 刷新模型列表 ──
+document.getElementById('aiModelRefreshBtn').addEventListener('click', async function () {
+    this.disabled = true;
+    await fetchModelList();
+    this.disabled = false;
+});
+// ── 模型下拉手动选择 → 更新偏好 ──
+document.getElementById('aiModelSelect').addEventListener('change', function () {
+    const v = this.value;
+    if (v === aiSettings.modelPro) aiSettings.modelPref = 'pro';
+    else { aiSettings.modelFlash = v; aiSettings.modelPref = 'flash'; }
+    saveAiSettings();
+    renderModelSeg();
+});
+// ── 保存设置 ──
+document.getElementById('aiSettingsSaveBtn').addEventListener('click', function () {
+    const num = (id, def, min, max) => {
+        const v = parseFloat(document.getElementById(id).value);
+        if (!isFinite(v)) return def;
+        return Math.min(max, Math.max(min, v));
+    };
+    aiSettings.serverUrl = document.getElementById('aiServerUrl').value.trim() || '/api';
+    aiSettings.temperature = num('aiTemperature', 0.7, 0, 2);
+    aiSettings.maxTokens = Math.round(num('aiMaxTokens', 8192, 256, 65536));
+    aiSettings.timeoutSec = Math.round(num('aiTimeoutSec', 120, 10, 600));
+    aiSettings.historyRounds = Math.round(num('aiHistoryRounds', 8, 1, 50));
+    aiSettings.stream = document.getElementById('aiStreamToggle').checked;
+    saveAiSettings();
+    renderModelSeg();
+    checkBackend().then(ok => { if (ok) fetchModelList(); });
+    settingsModal.style.display = 'none';
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   FILE UPLOAD & PARSE — Excel/CSV/PDF/图片 · chip 暂存 · 服务端优先
+   ══════════════════════════════════════════════════════════════════ */
+const MAX_FILE_BYTES = 20 * 1024 * 1024;   // 单文件 20MB
+const MAX_FILES = 10;                       // 单次最多 10 个
+const EXCEL_EXTS = ['xlsx', 'xls', 'csv'];
+const IMAGE_EXTS = ['png', 'jpg', 'jpeg', 'webp', 'gif', 'bmp'];
+let aiFiles = [];            // {id,name,size,ext,kind,status,text,images,thumbUrl,error}
+let aiFileSeq = 0;
+
+/** 依据扩展名判定文件类别 */
+function fileKind(ext) {
+    if (EXCEL_EXTS.includes(ext)) return 'excel';
+    if (ext === 'pdf') return 'pdf';
+    if (IMAGE_EXTS.includes(ext)) return 'image';
+    return null;
+}
+/** 入口：添加文件（选择 / 拖拽 / 粘贴） */
+function addAiFiles(fileList) {
+    const files = [...fileList];
+    if (!files.length) return;
+    let rejected = [];
+    for (const f of files) {
+        const ext = (f.name.split('.').pop() || '').toLowerCase();
+        const kind = fileKind(ext);
+        if (!kind) { rejected.push(`${f.name}：不支持的格式`); continue; }
+        if (f.size > MAX_FILE_BYTES) { rejected.push(`${f.name}：超过 20MB 上限`); continue; }
+        if (aiFiles.length >= MAX_FILES) { rejected.push(`${f.name}：单次最多 ${MAX_FILES} 个文件`); continue; }
+        aiFiles.push({
+            id: 'f' + (++aiFileSeq), name: f.name, size: f.size, ext, kind,
+            status: 'parsing', text: '', images: [], thumbUrl: '', error: '', file: f
+        });
+        parseAiFile(aiFiles[aiFiles.length - 1]);
+    }
+    renderFileChips();
+    if (rejected.length) alert('以下文件未添加：\n· ' + rejected.join('\n· '));
+}
+/** 删除暂存文件 */
+function removeAiFile(id) {
+    const f = aiFiles.find(x => x.id === id);
+    if (f && f.thumbUrl && f.thumbUrl.startsWith('blob:')) { try { URL.revokeObjectURL(f.thumbUrl); } catch (e) {} }
+    aiFiles = aiFiles.filter(x => x.id !== id);
+    renderFileChips();
+}
+/** 人类可读的文件大小 */
+function humanSize(bytes) {
+    if (bytes >= 1024 * 1024) return (bytes / 1024 / 1024).toFixed(1) + ' MB';
+    if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+    return bytes + ' B';
+}
+/** 渲染文件 chip 列表 */
+function renderFileChips() {
+    const wrap = document.getElementById('aiFileChips');
+    wrap.style.display = aiFiles.length ? '' : 'none';
+    wrap.innerHTML = aiFiles.map(f => {
+        const stCls = f.status === 'ready' ? 'st-ready' : f.status === 'failed' ? 'st-failed' : 'st-parsing';
+        const stTxt = f.status === 'ready' ? '已就绪' : f.status === 'failed' ? ('失败：' + f.error) : '解析中…';
+        const iconMap = { excel: 'sheet', pdf: 'file-text', image: 'image' };
+        const visual = f.thumbUrl
+            ? `<img class="thumb" src="${f.thumbUrl}" alt="">`
+            : `<span class="ficon"><i data-lucide="${iconMap[f.kind]}" class="h-4 w-4"></i></span>`;
+        return `<div class="file-chip" data-fid="${f.id}">
+            ${visual}
+            <span class="fmeta">
+                <span class="fname">${escapeHtml(f.name)}</span>
+                <span class="fstat ${stCls}">${humanSize(f.size)} · ${escapeHtml(stTxt)}</span>
+            </span>
+            <button type="button" class="fdel" title="移除"><i data-lucide="x" class="h-3.5 w-3.5 pointer-events-none"></i></button>
+        </div>`;
+    }).join('');
+    lucide.createIcons();
+}
+document.getElementById('aiFileChips').addEventListener('click', function (e) {
+    const del = e.target.closest('.fdel');
+    if (del) removeAiFile(del.closest('[data-fid]').dataset.fid);
+});
+document.getElementById('aiAttachBtn').addEventListener('click', () => document.getElementById('aiFileInput').click());
+document.getElementById('aiFileInput').addEventListener('change', function () {
+    addAiFiles(this.files);
+    this.value = '';
+});
+// 拖拽上传（输入区整个容器）
+const dropZone = document.getElementById('aiDropZone');
+['dragenter', 'dragover'].forEach(ev => dropZone.addEventListener(ev, function (e) {
+    e.preventDefault(); e.stopPropagation(); this.classList.add('drop-highlight');
+}));
+['dragleave', 'drop'].forEach(ev => dropZone.addEventListener(ev, function (e) {
+    e.preventDefault(); e.stopPropagation(); this.classList.remove('drop-highlight');
+}));
+dropZone.addEventListener('drop', function (e) {
+    if (e.dataTransfer && e.dataTransfer.files.length) addAiFiles(e.dataTransfer.files);
+});
+// Ctrl+V 粘贴图片
+document.addEventListener('paste', function (e) {
+    if (!aiOpen && window.innerWidth >= 1024) return;
+    const items = e.clipboardData && e.clipboardData.items;
+    if (!items) return;
+    const imgs = [];
+    for (const it of items) {
+        if (it.kind === 'file' && it.type.startsWith('image/')) {
+            const f = it.getAsFile();
+            if (f) imgs.push(new File([f], f.name || `粘贴图片_${Date.now()}.png`, { type: f.type }));
+        }
+    }
+    if (imgs.length) { e.preventDefault(); addAiFiles(imgs); }
+});
+
+/** 单文件解析：优先服务端 /api/parse，失败回退本地解析 */
+async function parseAiFile(f) {
+    renderFileChips();
+    try {
+        const ok = await parseViaServer(f);
+        if (!ok) await parseLocally(f);
+    } catch (e) {
+        try { await parseLocally(f); }
+        catch (e2) { f.status = 'failed'; f.error = (e2 && e2.message) || '未知错误'; }
+    }
+    renderFileChips();
+}
+/** 服务端解析通道 */
+async function parseViaServer(f) {
+    if (!backendState.connected) return false;
+    try {
+        const fd = new FormData();
+        fd.append('files', f.file, f.name);
+        const r = await apiFetch('/parse', { method: 'POST', body: fd, signal: AbortSignal.timeout(60000) });
+        if (!r.ok) return false;
+        const j = await r.json();
+        const res = (j.results || []).find(x => x.filename === f.name) || (j.results || [])[0];
+        if (!res || res.status !== 'ok') return false;
+        if (res.needsVision) return false;          // 扫描件 → 本地渲染为图片
+        f.text = res.text || '';
+        f.images = res.images || [];
+        if (f.kind === 'image' && f.images[0]) f.thumbUrl = f.images[0];
+        f.status = (f.text || f.images.length) ? 'ready' : 'failed';
+        if (f.status === 'failed') f.error = '未解析到有效内容';
+        return f.status === 'ready';
+    } catch (e) { return false; }
+}
+/** 本地解析回退通道 */
+async function parseLocally(f) {
+    if (f.kind === 'excel') { f.text = await localParseExcel(f.file); f.status = 'ready'; }
+    else if (f.kind === 'image') { f.images = [await localCompressImage(f.file)]; f.thumbUrl = f.images[0]; f.status = 'ready'; }
+    else if (f.kind === 'pdf') await localParsePdf(f);
+    if (f.status === 'ready' && f.kind !== 'image' && !f.text && !f.images.length) {
+        f.status = 'failed'; f.error = '未解析到有效内容';
+    }
+}
+/** 本地 Excel/CSV 解析（SheetJS → 结构化 TSV 文本，超长截断） */
+async function localParseExcel(file) {
+    if (!window.XLSX) throw new Error('SheetJS 库未加载（CDN 不可用）');
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    let out = '';
+    let truncated = false;
+    for (const sn of wb.SheetNames) {
+        const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn], { header: 1, raw: false, defval: '' });
+        out += `\n[工作表: ${sn}] 共 ${rows.length} 行\n`;
+        rows.slice(0, 200).forEach(r => { out += r.map(c => String(c)).join('\t') + '\n'; });
+        if (rows.length > 200) { truncated = true; out += `…（其余 ${rows.length - 200} 行已截断）\n`; }
+    }
+    if (out.length > 60000) { out = out.slice(0, 60000) + '\n…（内容过长已截断）'; truncated = true; }
+    if (truncated) out += '\n[注意: 文件内容已按行截断]';
+    return out.trim();
+}
+/** 本地图片压缩：长边 ≤1600px 后转 base64 dataURL */
+async function localCompressImage(file) {
+    // GIF 小文件原样保留（保留动画）；BMP 一律转码（DeepSeek 不支持 BMP）
+    const isGif = (file.type === 'image/gif');
+    if ((isGif && file.size <= 2 * 1024 * 1024)) {
+        const raw = await new Promise((res, rej) => {
+            const fr = new FileReader();
+            fr.onload = () => res(fr.result); fr.onerror = () => rej(new Error('读取文件失败'));
+            fr.readAsDataURL(file);
+        });
+        return raw;
+    }
+    const dataUrl = await new Promise((res, rej) => {
+        const fr = new FileReader();
+        fr.onload = () => res(fr.result); fr.onerror = () => rej(new Error('读取文件失败'));
+        fr.readAsDataURL(file);
+    });
+    const img = await new Promise((res, rej) => {
+        const im = new Image();
+        im.onload = () => res(im); im.onerror = () => rej(new Error('图片解码失败'));
+        im.src = dataUrl;
+    });
+    const long = Math.max(img.naturalWidth, img.naturalHeight);
+    const scale = long > 1600 ? 1600 / long : 1;
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const canvas = document.createElement('canvas');
+    canvas.width = w; canvas.height = h;
+    canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+    return canvas.toDataURL('image/jpeg', 0.9);
+}
+/** 本地 PDF 解析（pdf.js）：优先取文本层；扫描件渲染页面为图片 */
+async function localParsePdf(f) {
+    if (!window.pdfjsLib) throw new Error('pdf.js 库未加载（CDN 不可用）');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.worker.min.js';
+    const buf = await f.file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+    let text = '';
+    const maxPages = Math.min(pdf.numPages, 30);
+    for (let i = 1; i <= maxPages; i++) {
+        const page = await pdf.getPage(i);
+        const tc = await page.getTextContent();
+        text += `\n[第 ${i} 页]\n` + tc.items.map(it => it.str).join(' ');
+    }
+    text = text.trim();
+    if (text.replace(/\s/g, '').length < 20) {
+        // 无文本层 → 扫描件：渲染为图片走视觉通道
+        f.images = [];
+        const pages = Math.min(pdf.numPages, 10);
+        for (let i = 1; i <= pages; i++) {
+            const page = await pdf.getPage(i);
+            const vp0 = page.getViewport({ scale: 1 });
+            const scale = Math.min(2, 1600 / Math.max(vp0.width, vp0.height));
+            const vp = page.getViewport({ scale });
+            const canvas = document.createElement('canvas');
+            canvas.width = Math.round(vp.width); canvas.height = Math.round(vp.height);
+            await page.render({ canvasContext: canvas.getContext('2d'), viewport: vp }).promise;
+            f.images.push(canvas.toDataURL('image/jpeg', 0.85));
+        }
+        f.text = `[扫描件 ${f.name}：共 ${pdf.numPages} 页，已渲染前 ${pages} 页为图片]`;
+    } else {
+        f.text = text + (pdf.numPages > maxPages ? `\n…（共 ${pdf.numPages} 页，仅提取前 ${maxPages} 页）` : '');
+    }
+    f.status = 'ready';
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   SYSTEM PROMPT — 注入放电表 / 输入结果 / 计算规则（模型必须遵守）
+   ══════════════════════════════════════════════════════════════════ */
+/** 构建注入给 AI 的系统提示词（含当前型号放电表与全部规则） */
+function buildSystemPrompt() {
+    const inputs = lastExportInputs;
+    const r = lastExportResult;
+    const model = inputs ? BATTERY_MODEL_MAP[inputs.batteryModelId] : null;
+    let s = '你是镍锌（Ni-Zn）电池后备系统配置专家，帮助用户在页面上确定最优配置。\n';
+    s += '你必须读取并严格遵守下面的计算逻辑（禁止自创公式、禁止线性插值、禁止编造放电表数据）。\n\n';
+    if (model) {
+        s += `【当前选中型号】${inputs.batteryModelId}（${model.specs.label}，单块 ${model.specs.weightKg} kg，cellsPerUnit=${model.specs.cellsPerUnit}，额定电压 ${model.specs.ratedVoltage} V）\n`;
+        s += '【恒功率放电表 (W/Cell)：行=EPV 截止电压，列=放电分钟数】\n';
+        const epvKeys = Object.keys(model.dischargeTable).sort((a, b) => parseFloat(b) - parseFloat(a));
+        const times = Object.keys(model.dischargeTable[epvKeys[0]]).map(Number).sort((a, b) => a - b);
+        s += 'EPV\\t' + times.join('\t') + '\n';
+        epvKeys.forEach(k => { s += k + 'V\t' + times.map(t => model.dischargeTable[k][t] ?? '—').join('\t') + '\n'; });
+        s += '\n';
+    }
+    if (inputs && r) {
+        s += '【当前页面输入】\n';
+        s += `电池型号=${inputs.batteryModelId}；UPS=${inputs.upsRatingKva} kVA；系统电压=${inputs.systemVoltage} V；PF=${inputs.powerFactor}；逆变效率=${inputs.inverterEfficiency}；EPV=${inputs.epv} V；节数=${inputs.cellsPerString}；块数=${r.blocksPerGroup}；组数=${inputs.numberOfStrings}；设计余量=${inputs.designMargin}；老化系数=${inputs.agingFactor}；温度=${inputs.temperature}℃；电压窗口=±${inputs.voltageRangePercent}%；备电=${inputs.backupTimeMin} 分钟；功率模式=${inputs.requiredPowerMode}${inputs.requiredPowerMode === 'manual' ? '（手动 ' + fmt(inputs.manualRequiredPower, 0) + ' W）' : ''}\n`;
+        s += '【当前页面计算结果】\n';
+        s += `总功率需求=${fmt(r.totalRequiredPower, 1)} W；查表 EPV=${r.matchedEpvKey}V；查表时间=${r.matchedTime}min；单节功率=${fmt(r.wattPerCellLookup, 1)} W/cell；单组功率=${fmt(r.totalPowerPerString, 1)} W；总提供功率=${fmt(r.totalProposedPower, 0)} W；满足率=${(r.satisfactionRatio * 100).toFixed(1)}%；预估后备=${fmt(r.estimatedRunTime, 1)} min；放电下限=${fmt(r.voltageValidation.batteryDischargeLower, 1)} V；充电上限=${fmt(r.voltageValidation.batteryChargeUpper, 1)} V；UPS 窗口=${fmt(r.voltageValidation.upsVoltageLower, 1)}~${fmt(r.voltageValidation.upsVoltageUpper, 1)} V；温度系数 TCV=${fmt(r.temperatureCoefficient, 4)}；标称电压=${fmt(r.configNominalVoltage, 1)} V；浮充电压=${fmt(r.configFloatVoltage, 1)} V；总数量=${r.totalQuantity} 块；总重=${fmt(r.totalWeight, 1)} kg；总能量=${fmt(r.totalEnergyKWh, 2)} kWh\n\n`;
+    }
+    s += '【必须遵守的计算规则】\n';
+    s += '1. 查表规则：EPV 取放电表中最接近的档位（不低于输入值的首个档位，均高于输入时取最小档），备电时间取表中最接近的时间点（不低于输入值的首个时间点，均小则取最大档）；禁止线性插值。\n';
+    s += '2. 温度系数：temperatureCoefficient = 1.9 - 0.016 × (temperature - 25)\n';
+    s += '3. 电池放电下限电压：batteryDischargeLower = epv × cellsPerString\n';
+    s += '4. 电池充电上限电压：batteryChargeUpper = temperatureCoefficient × cellsPerString\n';
+    s += '5. UPS 电压窗口：upsVoltageLower = systemVoltage × (1 - voltageRangePercent/100)，upsVoltageUpper = systemVoltage × (1 + voltageRangePercent/100)；要求 batteryDischargeLower ≥ upsVoltageLower 且 batteryChargeUpper ≤ upsVoltageUpper。\n';
+    s += '6. 自动所需功率：autoRequiredPower = upsRatingKva × 1000 × powerFactor / inverterEfficiency / agingFactor × designMargin；手动模式则直接使用 manualRequiredPower。\n';
+    s += '7. 功率法：unitsPerString = cellsPerString / 8；powerPerUnit = wattPerCell × 8；totalPowerPerString = wattPerCell × cellsPerString；totalProposedPower = totalPowerPerString × numberOfStrings；satisfactionRatio = totalProposedPower / totalRequiredPower；estimatedRunTime = backupTimeMin × satisfactionRatio；maxCurrent = totalRequiredPower / (epv × cellsPerString)；maxCurrentPerString = maxCurrent / numberOfStrings。\n';
+    s += '8. 容量法：requiredWh = totalRequiredPower × (backupTimeMin/60)；blocksPerGroup = ceil(cellsPerString / 8)；stringNominalVoltage = 13.2 × blocksPerGroup；requiredAhPerString = requiredWh / stringNominalVoltage / numberOfStrings；providedAhPerString = 型号额定 Ah；capSatisfactionRatio = providedAhPerString / requiredAhPerString。\n';
+    s += '9. 配置电压：configNominalVoltage = 13.2 × blocksPerGroup；configFloatVoltage = (temperatureCoefficient - 0.05) × cellsPerString。\n';
+    s += '10. 数量与重量：totalQuantity = unitsPerString × numberOfStrings；totalWeight = totalQuantity × 单块重量；totalEnergyKWh = 13.2 × 额定Ah × totalQuantity / 1000。\n';
+    s += '11. 硬性约束：cellsPerString 必须是 8 的整数倍；满足率 satisfactionRatio 建议 ≥ 1.0（低于 1.0 必须明确警示）；所有推荐必须能在本页面复算并与页面结果一致，你必须在回复中给出复算过程。\n\n';
+    s += '【输出要求】\n';
+    s += '- 先输出给人看的分析正文（Markdown，可用表格与代码块），包含逐步复算过程。\n';
+    s += '- 正文之后、回复的最末尾，输出一个机器可读的配置建议 JSON，用 <CONFIG_JSON> 和 </CONFIG_JSON> 包裹。\n';
+    s += '- JSON 字段（必须全部包含，值为推荐值）：batteryModel（型号ID，只允许 "8XNFG90" 或 "8XNFZ38"）、upsRatingKva、systemVoltage、powerFactor、inverterEfficiency、epv、cellsPerString（8 的整数倍）、blocksPerGroup（= cellsPerString/8）、numberOfStrings、designMargin、agingFactor、temperature、voltageRangePercent、backupTimeMin（分钟）、requiredPowerMode（"auto" 或 "manual"）、manualRequiredPower（auto 时给 0）、calcMode（"power" 或 "capacity"）、reason（对象，键为上述字段名，值为该字段的推荐理由字符串）。\n';
+    s += '- 数值字段一律输出数字而非字符串；不需要修改的字段也必须输出（值等于当前值即可）。\n';
+    s += '- <CONFIG_JSON> 之后不要再输出任何其他内容。\n';
+    return s;
+}
+/** 当前配置 + 结果的上下文文本（「发送当前配置」按钮用） */
+function buildContextDump() {
+    return lastCopySummary || (lastExportInputs && lastExportResult ? buildConfigSummary(lastExportInputs, lastExportResult) : '');
+}
+/** 规则折叠面板内容刷新 */
+function refreshRulesPanel() {
+    const pre = document.getElementById('aiRulesContent');
+    if (pre) pre.textContent = buildSystemPrompt();
+}
+document.getElementById('aiRulesPanel').addEventListener('toggle', function () {
+    if (this.open) refreshRulesPanel();
+});
+// 页面重算后（configSummaryText 变化）自动刷新规则面板与已附加上下文
+new MutationObserver(() => {
+    if (document.getElementById('aiRulesPanel')?.open) refreshRulesPanel();
+    if (contextAttached) renderContextChips();
+}).observe(document.getElementById('configSummaryText'), { childList: true, characterData: true, subtree: true });
+
+/* ══════════════════════════════════════════════════════════════════
+   AI CHAT — 多轮上下文 / SSE 流式 / 停止 / 错误分类 / Markdown 渲染
+   ══════════════════════════════════════════════════════════════════ */
+const aiMsgs = document.getElementById('aiMsgs');
+const aiInput = document.getElementById('aiInput');
+let aiHistory = [];            // [{role:'user'|'assistant', content:string}]
+let aiController = null;       // AbortController
+let contextAttached = false;   // 是否已附加当前计算结果
+
+/** 滚动消息区到底部 */
+function scrollMsgs() { aiMsgs.scrollTop = aiMsgs.scrollHeight; }
+/** 追加用户气泡 */
+function addUserMsg(text) {
+    const div = document.createElement('div');
+    div.className = 'msg msg-user';
+    div.textContent = text;
+    aiMsgs.appendChild(div);
+    scrollMsgs();
+    return div;
+}
+/** 追加 AI 气泡（Markdown 渲染容器） */
+function addAiMsg() {
+    const div = document.createElement('div');
+    div.className = 'msg msg-ai';
+    div.innerHTML = '<div class="md-body"><span class="typing-dots"><i></i><i></i><i></i></span></div>';
+    aiMsgs.appendChild(div);
+    scrollMsgs();
+    return div;
+}
+/** 追加错误气泡 */
+function addErrMsg(text) {
+    const div = document.createElement('div');
+    div.className = 'msg msg-err';
+    div.textContent = '⚠ ' + text;
+    aiMsgs.appendChild(div);
+    scrollMsgs();
+}
+/** 追加系统提示条 */
+function addSysTip(text) {
+    const div = document.createElement('div');
+    div.className = 'msg-sys-tip';
+    div.textContent = text;
+    aiMsgs.appendChild(div);
+    scrollMsgs();
+}
+/** Markdown 渲染（剥离 CONFIG_JSON；库缺失时降级纯文本） */
+function renderMarkdown(fullText, container) {
+    const { text: visible } = splitConfigJson(fullText);
+    const body = container.querySelector('.md-body');
+    if (!body) return;
+    if (window.marked && window.DOMPurify) {
+        try {
+            body.innerHTML = DOMPurify.sanitize(marked.parse(visible || '（空回复）'), { ADD_ATTR: ['target'] });
+            return;
+        } catch (e) { /* fallthrough */ }
+    }
+    body.innerHTML = '<pre style="white-space:pre-wrap">' + escapeHtml(visible || '（空回复）') + '</pre>';
+}
+/** 从完整回复中拆分 <CONFIG_JSON> */
+function splitConfigJson(fullText) {
+    const m = String(fullText || '').match(/<CONFIG_JSON>([\s\S]*?)<\/CONFIG_JSON>/i);
+    if (!m) return { text: fullText || '', cfg: null };
+    let cfg = null;
+    try { cfg = JSON.parse(m[1].trim()); } catch (e) { cfg = null; }
+    return { text: fullText.replace(/<CONFIG_JSON>[\s\S]*?<\/CONFIG_JSON>/i, '').trim(), cfg };
+}
+/** 上下文 chip 渲染 */
+function renderContextChips() {
+    const wrap = document.getElementById('aiContextChips');
+    wrap.style.display = contextAttached ? '' : 'none';
+    if (contextAttached) {
+        wrap.innerHTML = `<span class="file-chip" style="max-width:100%">
+            <span class="ficon"><i data-lucide="clipboard-copy" class="h-4 w-4"></i></span>
+            <span class="fmeta"><span class="fname">已附加：当前配置与计算结果（发送时自动更新为最新值）</span></span>
+            <button type="button" class="fdel" id="aiCtxDel" title="移除"><i data-lucide="x" class="h-3.5 w-3.5 pointer-events-none"></i></button>
+        </span>`;
+        lucide.createIcons();
+    }
+}
+document.getElementById('aiContextChips').addEventListener('click', function (e) {
+    if (e.target.closest('#aiCtxDel')) { contextAttached = false; renderContextChips(); }
+});
+document.getElementById('aiSendContextBtn').addEventListener('click', function () {
+    contextAttached = !contextAttached;
+    renderContextChips();
+});
+document.getElementById('aiClearChatBtn').addEventListener('click', function () {
+    aiHistory = [];
+    aiMsgs.innerHTML = '';
+    addSysTip('对话已清空（页面配置不受影响）');
+});
+/** 上游/网络错误 → 中文可读提示 */
+function classifyHttpError(status, bodyText) {
+    let upstream = '';
+    try { const j = JSON.parse(bodyText); upstream = (j.message || (j.error && j.error.message) || ''); } catch (e) {}
+    switch (status) {
+        case 400: return '请求被拒绝（400）：' + (upstream || '请检查消息内容或文件大小。');
+        case 401: return 'API Key 无效或已过期（401）。请在设置中检查密钥，或确认服务端 .env 已正确配置。';
+        case 402: return 'DeepSeek 账户余额不足（402），请前往 DeepSeek 平台充值后重试。';
+        case 429: return '请求过于频繁或触发限流（429），请稍后再试。';
+        case 408: return '请求超时（408），可在设置中调大超时时间。';
+        case 502: case 503: case 504: return '上游服务暂时不可用（' + status + '），请稍后再试。';
+        default: return '请求失败（HTTP ' + status + '）：' + (upstream || '未知错误。');
+    }
+}
+/** 发送消息（文字 + 暂存文件 + 可选上下文） */
+async function sendAiMessage() {
+    if (aiController) { addSysTip('正在生成中，请先点击「停止」'); return; }
+    const userText = aiInput.value.trim();
+    const parsing = aiFiles.some(f => f.status === 'parsing');
+    if (parsing) { addErrMsg('仍有文件在解析中，请稍候再发送。'); return; }
+    const readyFiles = aiFiles.filter(f => f.status === 'ready');
+    if (!userText && !readyFiles.length && !contextAttached) { addSysTip('请输入文字，或添加附件 / 点击「发送当前配置」'); return; }
+    if (!aiSettings.userKey && !backendState.hasServerKey) {
+        renderBackendStatus();
+        addErrMsg('尚未配置 API Key：服务端未检测到密钥，个人密钥也未填写。请点击右上角 ⚙ 打开设置配置后重试。');
+        return;
+    }
+    // 组装消息内容
+    let fullText = '';
+    if (contextAttached) {
+        const dump = buildContextDump();
+        if (dump) fullText += '【当前页面配置与计算结果（实时快照）】\n' + dump + '\n\n';
+    }
+    const imageParts = [];
+    for (const f of readyFiles) {
+        if (f.kind === 'image') {
+            for (const img of f.images.slice(0, 5)) {
+                imageParts.push({ type: 'image_url', image_url: { url: img } });
+            }
+            fullText += `【图片附件：${f.name}】\n`;
+        } else {
+            fullText += `【文件：${f.name}】\n${(f.text || '').slice(0, 60000)}\n\n`;
+        }
+    }
+    fullText += userText || '请分析以上内容并给出配置建议。';
+    const userContent = imageParts.length
+        ? [{ type: 'text', text: fullText }, ...imageParts]
+        : fullText;
+    addUserMsg(userText + (readyFiles.length ? `\n📎 ${readyFiles.map(f => f.name).join('、')}` : '') + (contextAttached ? '\n📋 已附加当前配置' : ''));
+    aiInput.value = '';
+    aiFiles = [];
+    renderFileChips();
+    contextAttached = false;
+    renderContextChips();
+
+    // 组装 messages（多轮上下文，按轮数截断）
+    const historySlice = aiHistory.slice(-aiSettings.historyRounds * 2);
+    const messages = [
+        { role: 'system', content: buildSystemPrompt() },
+        ...historySlice,
+        { role: 'user', content: userContent }
+    ];
+    const body = {
+        model: currentModelId(),
+        messages,
+        stream: !!aiSettings.stream,
+        temperature: aiSettings.temperature,
+        max_tokens: aiSettings.maxTokens
+    };
+    const aiDiv = addAiMsg();
+    setGenerating(true);
+    aiController = new AbortController();
+    const timer = setTimeout(() => aiController.abort('timeout'), Math.max(10, aiSettings.timeoutSec) * 1000);
+    let acc = '';
+    let lastRender = 0;
+    const throttledRender = () => {
+        const now = Date.now();
+        if (now - lastRender > 120) { lastRender = now; renderMarkdown(acc, aiDiv); scrollMsgs(); }
+    };
+    try {
+        const r = await apiFetch('/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+            signal: aiController.signal
+        });
+        if (!r.ok) {
+            const txt = await r.text().catch(() => '');
+            throw { http: r.status, body: txt };
+        }
+        if (aiSettings.stream && r.body) {
+            const reader = r.body.getReader();
+            const dec = new TextDecoder();
+            let buf = '';
+            let doneStream = false;
+            while (!doneStream) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buf += dec.decode(value, { stream: true });
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    const s = line.trim();
+                    if (!s.startsWith('data:')) continue;
+                    const payload = s.slice(5).trim();
+                    if (payload === '[DONE]') { doneStream = true; break; }
+                    try {
+                        const j = JSON.parse(payload);
+                        const delta = j.choices && j.choices[0] && j.choices[0].delta && j.choices[0].delta.content;
+                        if (delta) { acc += delta; throttledRender(); }
+                    } catch (e) { /* 忽略无法解析的块 */ }
+                }
+            }
+        } else {
+            const j = await r.json();
+            acc = (j.choices && j.choices[0] && j.choices[0].message && j.choices[0].message.content) || '';
+        }
+        if (!acc) acc = '（模型未返回内容，请重试或更换模型。）';
+        renderMarkdown(acc, aiDiv);
+        renderConfigCard(acc, aiDiv);
+        // 写入历史（仅文本部分进入上下文，避免图片重复上传）
+        aiHistory.push({ role: 'user', content: typeof userContent === 'string' ? userContent : fullText });
+        aiHistory.push({ role: 'assistant', content: acc });
+    } catch (e) {
+        if (e && (e.name === 'AbortError' || aiController.signal.aborted)) {
+            if (timer._fired || aiController.signal.reason === 'timeout') {
+                addErrMsg(`请求超时（>${aiSettings.timeoutSec}s）。可在设置中调大超时时间后重试。`);
+            } else {
+                renderMarkdown(acc || '（已停止生成）', aiDiv);
+                addSysTip('已停止生成');
+                if (acc) { aiHistory.push({ role: 'assistant', content: acc }); }
+            }
+        } else if (e && e.http) {
+            addErrMsg(classifyHttpError(e.http, e.body));
+        } else {
+            console.error(e);
+            addErrMsg('无法连接后端服务：请确认已运行 npm start 并访问 http://localhost:3000；若自定义了服务地址请检查设置（浏览器直连 api.deepseek.com 会被 CORS 拦截）。');
+        }
+    } finally {
+        clearTimeout(timer);
+        aiController = null;
+        setGenerating(false);
+        scrollMsgs();
+    }
+}
+/** 切换 生成中/空闲 按钮状态 */
+function setGenerating(busy) {
+    document.getElementById('aiSendBtn').style.display = busy ? 'none' : '';
+    document.getElementById('aiStopBtn').style.display = busy ? '' : 'none';
+}
+document.getElementById('aiSendBtn').addEventListener('click', sendAiMessage);
+document.getElementById('aiStopBtn').addEventListener('click', () => { if (aiController) aiController.abort('user'); });
+aiInput.addEventListener('keydown', function (e) {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') { e.preventDefault(); sendAiMessage(); }
+});
+// textarea 自动增高
+aiInput.addEventListener('input', function () {
+    this.style.height = 'auto';
+    this.style.height = Math.min(140, this.scrollHeight) + 'px';
+});
+
+/* ══════════════════════════════════════════════════════════════════
+   CONFIG_JSON — 建议卡片渲染 / 校验 / 一键填入 / 撤销
+   ══════════════════════════════════════════════════════════════════ */
+const $id = (id) => document.getElementById(id);
+/** 字段定义：读取当前值 / 校验 / 写入（含联动） */
+const CFG_FIELDS = [
+    { key: 'batteryModel', label: '电池型号', isNum: false, current: () => $id('batteryModel').value,
+      validate: v => BATTERY_MODEL_MAP[v] ? null : '型号不存在', apply: v => { $id('batteryModel').value = v; } },
+    { key: 'calcMode', label: '计算模式', isNum: false, current: () => calcMode,
+      validate: v => ['power', 'capacity'].includes(v) ? null : '仅允许 power/capacity', apply: v => setCalcMode(v), order: -2 },
+    { key: 'requiredPowerMode', label: '功率模式', isNum: false, current: () => requiredPowerMode,
+      validate: v => ['auto', 'manual'].includes(v) ? null : '仅允许 auto/manual', apply: v => { applyPowerModeUI(v); }, order: -1 },
+    { key: 'systemVoltage', label: '系统电压 (V)', min: 1, current: () => $id('systemVoltage').value,
+      validate: vNum, apply: v => { $id('systemVoltage').value = v; }, card: 'cardRequiredPower' },
+    { key: 'upsRatingKva', label: 'UPS 容量 (kVA)', min: 1, current: () => $id('upsRatingKva').value,
+      validate: vNum, apply: v => { $id('upsRatingKva').value = v; }, card: 'cardRequiredPower' },
+    { key: 'powerFactor', label: '功率因数', min: 0.1, max: 1, current: () => $id('powerFactor').value,
+      validate: vNum, apply: v => { $id('powerFactor').value = v; }, card: 'cardRequiredPower' },
+    { key: 'inverterEfficiency', label: '逆变效率', min: 0.5, max: 1, current: () => $id('inverterEfficiency').value,
+      validate: vNum, apply: v => { $id('inverterEfficiency').value = v; }, card: 'cardRequiredPower' },
+    { key: 'epv', label: 'EPV (V)', min: 1, max: 1.6, current: () => $id('epv').value,
+      validate: vNum, apply: v => { $id('epv').value = v; }, card: 'cardWattPerCell' },
+    { key: 'cellsPerString', label: '单组节数', min: 8, step: 8, current: () => $id('cellsPerString').value,
+      validate: v => { const e = vNum(v); if (e) return e; if (v % 8 !== 0) return '必须是 8 的整数倍'; return null; },
+      apply: v => { $id('cellsPerString').value = v; }, card: 'cardPowerPerString' },
+    { key: 'blocksPerGroup', label: '单组块数', min: 1, current: () => $id('blocksPerGroupDisplay').value,
+      validate: vNum, apply: v => { $id('blocksPerGroupDisplay').value = v; syncCellsFromBlocks(); }, card: 'cardNominalVoltage' },
+    { key: 'numberOfStrings', label: '电池组数', min: 1, current: () => $id('numberOfStrings').value,
+      validate: vNum, apply: v => { $id('numberOfStrings').value = v; }, card: 'cardPowerPerString' },
+    { key: 'designMargin', label: '设计余量', min: 0.8, max: 2, current: () => $id('designMargin').value,
+      validate: vNum, apply: v => { $id('designMargin').value = v; }, card: 'cardRequiredPower' },
+    { key: 'agingFactor', label: '老化系数', min: 0.5, max: 2, current: () => $id('agingFactor').value,
+      validate: vNum, apply: v => { $id('agingFactor').value = v; }, card: 'cardRequiredPower' },
+    { key: 'temperature', label: '环境温度 (℃)', min: -20, max: 60, current: () => $id('temperature').value,
+      validate: vNum, apply: v => { $id('temperature').value = v; } },
+    { key: 'voltageRangePercent', label: '电压窗口 ±%', min: 0, max: 100, current: () => $id('voltageRangePercent').value,
+      validate: vNum, apply: v => { $id('voltageRangePercent').value = v; updateUpsVoltageRangeFromPercent(); } },
+    { key: 'backupTimeMin', label: '备电时间 (min)', min: 1, current: () => String(backupTimeMin),
+      validate: vNum, apply: v => {
+          backupTimeMin = Number(v);
+          document.querySelectorAll('#backupTimeButtons .btn-time').forEach(b =>
+              b.classList.toggle('active', parseFloat(b.dataset.time) === backupTimeMin));
+          $id('currentBackupTime').textContent = formatBackupTimeLabel(backupTimeMin);
+          $id('backupTimeInput').value = backupTimeMin;
+      } },
+    { key: 'manualRequiredPower', label: '手动功率 (W)', min: 0, current: () => $id('requiredPowerInput').value,
+      validate: vNum, apply: v => { $id('requiredPowerInput').value = v; }, card: 'cardRequiredPower' },
+];
+/** 数值基础校验 */
+function vNum(raw) {
+    const v = Number(raw);
+    if (!isFinite(v)) return '不是有效数字';
+    return null;
+}
+/** 带范围/步进的校验（CFG_FIELDS.validate 引用） */
+function validateField(def, raw) {
+    let v = raw;
+    if (def.isNum === false) {
+        const err = def.validate ? def.validate(v) : null;
+        return err;
+    }
+    const num = Number(raw);
+    const base = vNum(num);
+    if (base) return base;
+    if (def.min !== undefined && num < def.min) return `不能小于 ${def.min}`;
+    if (def.max !== undefined && num > def.max) return `不能大于 ${def.max}`;
+    if (def.step && def.min !== undefined) {
+        const k = (num - def.min) / def.step;
+        if (Math.abs(Math.round(k) - k) > 1e-9) return `必须为 ${def.min} + ${def.step} 的整数倍`;
+    }
+    const err = def.validate ? def.validate(num) : null;
+    return err;
+}
+/** 数值近似相等（当前值 vs 推荐值） */
+function sameVal(a, b) {
+    const na = Number(a), nb = Number(b);
+    if (isFinite(na) && isFinite(nb)) return Math.abs(na - nb) < 1e-9;
+    return String(a) === String(b);
+}
+/** 在 AI 气泡下渲染推荐配置卡（含勾选 / 一键填入 / 撤销） */
+function renderConfigCard(fullText, aiDiv) {
+    const { cfg } = splitConfigJson(fullText);
+    if (!cfg || typeof cfg !== 'object') return;
+    const rows = [];
+    const reasons = (cfg.reason && typeof cfg.reason === 'object') ? cfg.reason : {};
+    CFG_FIELDS.forEach(def => {
+        if (!(def.key in cfg)) return;
+        const rec = cfg[def.key];
+        const cur = def.current();
+        const changed = !sameVal(cur, rec);
+        rows.push({ def, rec, cur, changed, reason: reasons[def.key] || '' });
+    });
+    if (!rows.length) return;
+    const card = document.createElement('div');
+    card.className = 'cfg-card';
+    card.innerHTML = `
+        <p class="mb-1.5 flex items-center gap-1.5 font-bold text-ink"><i data-lucide="clipboard-check" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>AI 推荐配置</p>
+        <div class="cfg-rows grid gap-0.5">
+        ${rows.map((r, i) => `
+            <label class="cfg-row ${r.changed ? 'changed' : ''}" title="${escapeHtml(r.reason)}">
+                <input type="checkbox" class="cfg-check h-3.5 w-3.5" data-ci="${i}" ${r.changed ? 'checked' : ''}>
+                <span class="text-ink2" style="min-width:92px">${escapeHtml(r.def.label)}</span>
+                <span class="${r.changed ? 'cfg-old' : 'text-ink3'}">${escapeHtml(String(r.cur))}</span>
+                <span class="arrow">→</span>
+                <span class="${r.changed ? 'cfg-new' : 'text-ink3'}">${escapeHtml(String(r.rec))}</span>
+                ${r.changed && r.reason ? `<span class="text-[10px] text-ink3" style="flex-basis:100%">理由：${escapeHtml(r.reason)}</span>` : ''}
+            </label>`).join('')}
+        </div>
+        <div class="mt-2 flex flex-wrap items-center gap-2">
+            <button type="button" class="btn btn-ok px-3 py-1.5 text-[11px]" data-act="apply">一键填入勾选项</button>
+            <button type="button" class="btn btn-ghost px-3 py-1.5 text-[11px]" data-act="undo" style="display:none">撤销填入</button>
+            <span class="cfg-result text-[11px] text-ink3"></span>
+        </div>`;
+    aiDiv.appendChild(card);
+    lucide.createIcons();
+    let snapshot = null;
+    card.addEventListener('click', function (e) {
+        const btn = e.target.closest('[data-act]');
+        if (!btn) return;
+        const result = card.querySelector('.cfg-result');
+        if (btn.dataset.act === 'apply') {
+            const picked = [...card.querySelectorAll('.cfg-check')].filter(c => c.checked).map(c => rows[Number(c.dataset.ci)]);
+            if (!picked.length) { result.textContent = '未勾选任何字段。'; result.style.color = 'rgb(var(--c-text-3))'; return; }
+            // 先全部校验
+            const invalid = [];
+            picked.forEach(r => {
+                const err = validateField(r.def, r.rec);
+                if (err) invalid.push(`${r.def.label}：${err}（推荐值 ${r.rec}）`);
+            });
+            if (invalid.length) {
+                result.textContent = '存在非法值，已拒绝填入 → ' + invalid.join('；');
+                result.style.color = 'rgb(var(--c-bad))';
+                return;
+            }
+            snapshot = captureCurrentConfig();
+            snapshot.calcMode = calcMode;
+            // 按依赖顺序写入：电压 → 节数 → 块数联动 → 其余
+            const orderKeys = ['batteryModel', 'systemVoltage', 'upsRatingKva', 'powerFactor', 'inverterEfficiency', 'epv', 'cellsPerString', 'blocksPerGroup', 'numberOfStrings', 'designMargin', 'agingFactor', 'temperature', 'voltageRangePercent', 'backupTimeMin', 'requiredPowerMode', 'manualRequiredPower', 'calcMode'];
+            picked.slice().sort((a, b) => orderKeys.indexOf(a.def.key) - orderKeys.indexOf(b.def.key)).forEach(r => r.def.apply(r.rec));
+            // 触发联动与全量重算
+            syncBlocksFromCells();
+            if (requiredPowerMode === 'manual' && !(parseFloat($id('requiredPowerInput').value) > 0)) {
+                $id('requiredPowerInput').value = Math.round(lastAutoRequiredPower || 0);
+            }
+            recalculate();
+            // 高亮 + 滚动
+            const cardIds = new Set();
+            picked.forEach(r => { if (r.def.card) cardIds.add(r.def.card); });
+            if (!cardIds.size) cardIds.add('cardRequiredPower');
+            $id('resultsPanel').scrollIntoView({ behavior: 'smooth', block: 'start' });
+            cardIds.forEach(cid => {
+                const el = $id(cid);
+                if (!el) return;
+                el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash');
+            });
+            card.querySelector('[data-act="undo"]').style.display = '';
+            result.textContent = `已填入 ${picked.length} 项并重新计算。`;
+            result.style.color = 'rgb(var(--c-ok))';
+        } else if (btn.dataset.act === 'undo') {
+            if (!snapshot) return;
+            CONFIG_FIELD_IDS.forEach(fid => {
+                if (snapshot[fid] !== undefined && $id(fid)) $id(fid).value = snapshot[fid];
+            });
+            backupTimeMin = parseFloat(snapshot.backupTimeMin) || backupTimeMin;
+            document.querySelectorAll('#backupTimeButtons .btn-time').forEach(b =>
+                b.classList.toggle('active', parseFloat(b.dataset.time) === backupTimeMin));
+            $id('currentBackupTime').textContent = formatBackupTimeLabel(backupTimeMin);
+            applyPowerModeUI(snapshot.requiredPowerMode === 'manual' ? 'manual' : 'auto');
+            setCalcMode(snapshot.calcMode === 'capacity' ? 'capacity' : 'power');
+            syncBlocksFromCells();
+            result.textContent = '已恢复填入前的配置。';
+            result.style.color = 'rgb(var(--c-text-3))';
+            btn.style.display = 'none';
+        }
+    });
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   GLOBAL KEYBOARD & INIT
+   ══════════════════════════════════════════════════════════════════ */
+document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape') return;
+    // Esc 优先级：设置面板 → 主题菜单 → 移动端抽屉
+    if (settingsModal.style.display !== 'none') {
+        settingsModal.style.display = 'none'; return;
+    }
+    const menu = document.getElementById('themeMenu');
+    if (menu.classList.contains('open')) { menu.classList.remove('open'); return; }
+    if (window.innerWidth < 1024 && aiOpen) setAiOpen(false);
+});
+
+window.addEventListener('DOMContentLoaded', async function () {
+    lucide.createIcons();
+    applyPowerModeUI('auto');
+    updateModeRecommend();
+    recalculate();
+    renderSavedConfigs();
+    renderContextChips();
+    refreshRulesPanel();
+    renderModelSeg();
+    renderKeyMask();
+    // 后端状态与模型列表（失败静默回退，不阻塞页面）
+    const ok = await checkBackend();
+    if (ok) await fetchModelList();
+});
+</script>
+
+</body>
+</html>
