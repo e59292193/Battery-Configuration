@@ -26,7 +26,11 @@ router.post('/chat', async (req, res, next) => {
     const start = Date.now();
     const upstreamAbort = new AbortController();
     let clientGone = false;
-    req.on('close', () => { clientGone = true; upstreamAbort.abort(); });
+    // 注意：req 的 'close' 事件在报文读取完成后即触发（Node 13+ 语义），
+    // 不能用于判断客户端断开；应监听 res 'close' 且响应未正常结束时才视为断开。
+    res.on('close', () => {
+        if (!res.writableEnded) { clientGone = true; upstreamAbort.abort(); }
+    });
     const timer = setTimeout(() => upstreamAbort.abort(new Error('upstream timeout')), env.upstreamTimeoutMs);
 
     try {

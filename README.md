@@ -67,9 +67,10 @@
 
 | 公式 | 定义 |
 |---|---|
-| 温度系数 | `TCV = 1.9 − 0.016 × (T − 25)` |
+| 温度补偿充电电压 | 单体口径：`TCV/cell = 1.9 − 0.002 × (T − 25)`；块级口径（8串/块）：`TCV/块 = 15.2 − 0.016 × (T − 25)`（两者等价，块级 ÷ 8 = 单体） |
 | 放电下限 | `batteryDischargeLower = EPV × cellsPerString` |
-| 充电上限 | `batteryChargeUpper = TCV × cellsPerString` |
+| 充电上限 | `batteryChargeUpper = TCV/cell × cellsPerString`（按电芯串数计算，4S2P 等型号自动正确） |
+| 浮充电压 | `configFloatVoltage = (TCV/cell − 0.05) × cellsPerString`，即块级 `TCV/块 − 0.4V` |
 | UPS 窗口 | `±voltageRangePercent%`；要求 放电下限 ≥ 窗口下限 且 充电上限 ≤ 窗口上限 |
 | 自动需求功率 | `upsRatingKva × 1000 × PF ÷ 逆变效率 ÷ 老化系数 × 设计余量` |
 | 功率法 | 查表（EPV、时间点就近取档，禁止插值）→ `满足率 = 总提供功率 ÷ 总需求功率`；`预估后备 = 备电 × 满足率` |

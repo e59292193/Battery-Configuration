@@ -335,7 +335,7 @@
                             </div>
                         </div>
                         <p class="mt-3 text-[11px] text-slate-300">
-                            温度系数公式: TCV = 1.9 − 0.016 × (T − 25℃) = <span class="font-bold text-blue-300" id="tcvDisplay">—</span>
+                            温度补偿充电电压: TCV/cell = 1.9 − 0.002 × (T − 25℃)；TCV/块(8串) = 15.2 − 0.016 × (T − 25℃) = <span class="font-bold text-blue-300" id="tcvDisplay">—</span>
                             <span class="ml-2 text-slate-400">(仅显示，不参与功率计算)</span>
                         </p>
                     </div>
@@ -456,7 +456,7 @@
                             <!-- Charge upper -->
                             <div class="flex items-center gap-3">
                                 <span class="rounded px-2 py-0.5 text-xs font-bold bg-emerald-500/20 text-emerald-300" id="vvChargeBadge">✓</span>
-                                <span class="min-w-[140px] text-xs text-slate-200">充电上限 (TCV×节数)</span>
+                                <span class="min-w-[140px] text-xs text-slate-200">充电上限 (TCV/cell×节数)</span>
                                 <span class="font-mono text-sm font-bold text-emerald-300" id="vvChargeUpper">—</span>
                                 <span class="text-[10px] text-red-400 hidden" id="vvChargeWarn"></span>
                             </div>
@@ -611,18 +611,33 @@ const BATTERY_MODELS = [
             "1.25": { 5:1053.8, 6:960.5, 10:695.4, 15:512.7, 20:399.4, 30:276.1, 45:189.1, 60:141.8, 120:74.4, 180:49.7, 240:37.5, 300:30.1, 360:25.2, 480:19.1, 600:15.3, 720:12.8, 900:10.3, 1200:7.7 },
             "1.20": { 5:1096.2, 6:997.0, 10:703.6, 15:513.9, 20:400.6, 30:278.1, 45:190.2, 60:142.7, 120:74.6, 180:49.8, 240:37.5, 300:30.1, 360:25.3, 480:19.1, 600:15.3, 720:12.8, 900:10.3, 1200:7.7 }
         },
-        specs: { label: "13.2V 90Ah", weightKg: 17.3, lengthM: 0.2912, widthM: 0.176, heightM: 0.184, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 90 }
+        constantCurrentTable: {
+            "1.45": { 5:621.8, 10:419.7, 15:306.3, 20:234.8, 30:161.6, 45:111.2, 60:85.3, 120:43.8, 180:29.5, 240:22.2, 300:17.8, 360:14.8, 480:11.1, 600:8.9, 720:7.4, 900:5.9, 1200:4.4 },
+            "1.40": { 5:694.4, 10:437.4, 15:314.8, 20:243.0, 30:166.0, 45:113.4, 60:86.6, 120:44.0, 180:29.6, 240:22.3, 300:17.9, 360:14.9, 480:11.2, 600:9.0, 720:7.5, 900:6.0, 1200:4.5 },
+            "1.35": { 5:743.6, 10:458.0, 15:322.9, 20:247.0, 30:168.0, 45:114.2, 60:86.8, 120:44.1, 180:29.7, 240:22.4, 300:18.0, 360:15.0, 480:11.2, 600:9.0, 720:7.5, 900:6.0, 1200:4.5 },
+            "1.30": { 5:784.7, 10:475.6, 15:330.2, 20:249.4, 30:169.1, 45:114.6, 60:87.0, 120:44.1, 180:29.7, 240:22.4, 300:18.0, 360:15.1, 480:11.3, 600:9.0, 720:7.5, 900:6.0, 1200:4.5 },
+            "1.25": { 5:823.0, 10:489.8, 15:334.5, 20:251.3, 30:170.2, 45:115.3, 60:87.4, 120:44.2, 180:29.8, 240:22.5, 300:18.1, 360:15.1, 480:11.4, 600:9.1, 720:7.6, 900:6.1, 1200:4.5 },
+            "1.20": { 5:870.9, 10:497.6, 15:341.7, 20:253.6, 30:171.9, 45:116.6, 60:88.5, 120:44.4, 180:30.0, 240:22.6, 300:18.2, 360:15.2, 480:11.4, 600:9.2, 720:7.6, 900:6.1, 1200:4.6 }
+        },
+        specs: { label: "13.2V 90Ah", weightKg: 17.3, lengthM: 0.2912, widthM: 0.176, heightM: 0.184, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 90, maxDischargeA: 900 }
     },
     {
         id: "8XNFZ38",
         dischargeTable: {
-            "1.40": { 5:406, 10:283.1, 15:222.9, 20:178.5, 30:129, 45:84.9, 60:66, 120:32.4, 180:21.7, 240:16.3, 300:13.1, 360:11, 480:8.2, 600:6.5, 720:5.3 },
-            "1.35": { 5:452.2, 10:304.3, 15:230.3, 20:181.8, 30:130.3, 45:86.1, 60:67, 120:33.3, 180:22.3, 240:16.8, 300:13.5, 360:11.3, 480:8.4, 600:6.6, 720:5.5 },
-            "1.30": { 5:481.3, 10:316.1, 15:234.1, 20:183.5, 30:131, 45:86.4, 60:67.1, 120:33.5, 180:22.4, 240:16.9, 300:13.6, 360:11.4, 480:8.5, 600:6.7, 720:5.5 },
-            "1.25": { 5:501.3, 10:322.7, 15:236.1, 20:184.6, 30:131.5, 45:86.7, 60:67.4, 120:33.8, 180:22.6, 240:17.1, 300:13.7, 360:11.5, 480:8.5, 600:6.7, 720:5.5 },
-            "1.20": { 5:514.4, 10:326, 15:237.6, 20:185.3, 30:134.4, 45:87, 60:67.7, 120:34, 180:22.8, 240:17.2, 300:13.8, 360:11.6, 480:8.6, 600:6.8, 720:5.6 }
+            "1.40": { 5:406, 10:283.1, 15:222.9, 20:178.5, 30:129, 45:84.9, 60:66, 120:32.4, 180:21.7, 240:16.3, 300:13.1, 360:11, 480:8.2, 600:6.5, 720:5.3, 900:4.3, 1200:3.2 },
+            "1.35": { 5:452.2, 10:304.3, 15:230.3, 20:181.8, 30:130.3, 45:86.1, 60:67, 120:33.3, 180:22.3, 240:16.8, 300:13.5, 360:11.3, 480:8.4, 600:6.6, 720:5.5, 900:4.4, 1200:3.3 },
+            "1.30": { 5:481.3, 10:316.1, 15:234.1, 20:183.5, 30:131, 45:86.4, 60:67.1, 120:33.5, 180:22.4, 240:16.9, 300:13.6, 360:11.4, 480:8.5, 600:6.7, 720:5.5, 900:4.4, 1200:3.3 },
+            "1.25": { 5:501.3, 10:322.7, 15:236.1, 20:184.6, 30:131.5, 45:86.7, 60:67.4, 120:33.8, 180:22.6, 240:17.1, 300:13.7, 360:11.5, 480:8.5, 600:6.7, 720:5.5, 900:4.4, 1200:3.3 },
+            "1.20": { 5:514.4, 10:326, 15:237.6, 20:185.3, 30:134.4, 45:87, 60:67.7, 120:34, 180:22.8, 240:17.2, 300:13.8, 360:11.6, 480:8.6, 600:6.8, 720:5.6, 900:4.5, 1200:3.3 }
         },
-        specs: { label: "13.2V 38Ah", weightKg: 7.8, lengthM: 0.2255, widthM: 0.1225, heightM: 0.1405, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 38 }
+        constantCurrentTable: {
+            "1.40": { 5:304.0, 10:190.0, 15:143.9, 20:110.1, 30:76.00, 45:49.20, 60:38.45, 120:18.54, 180:12.68, 240:9.27, 300:7.61, 360:6.34, 480:4.78, 600:3.80, 720:3.17, 900:2.53, 1200:1.90 },
+            "1.35": { 5:343.8, 10:199.3, 15:148.4, 20:112.2, 30:76.80, 45:50.50, 60:38.96, 120:18.80, 180:12.87, 240:9.40, 300:7.72, 360:6.43, 480:4.85, 600:3.86, 720:3.22, 900:2.57, 1200:1.93 },
+            "1.30": { 5:370.7, 10:203.9, 15:150.9, 20:113.3, 30:77.40, 45:51.50, 60:39.15, 120:18.85, 180:12.90, 240:9.43, 300:7.74, 360:6.45, 480:4.86, 600:3.87, 720:3.23, 900:2.58, 1200:1.94 },
+            "1.25": { 5:385.5, 10:206.3, 15:152.0, 20:114.0, 30:77.70, 45:51.70, 60:39.33, 120:18.94, 180:12.96, 240:9.47, 300:7.77, 360:6.48, 480:4.88, 600:3.89, 720:3.24, 900:2.59, 1200:1.95 },
+            "1.20": { 5:394.5, 10:208.2, 15:153.1, 20:114.6, 30:78.20, 45:52.00, 60:39.50, 120:19.00, 180:13.00, 240:9.50, 300:7.80, 360:6.50, 480:4.90, 600:3.90, 720:3.25, 900:2.60, 1200:1.95 }
+        },
+        specs: { label: "13.2V 38Ah", weightKg: 7.8, lengthM: 0.2255, widthM: 0.1225, heightM: 0.1405, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 38, maxDischargeA: 380 }
     }
 ];
 const BATTERY_MODEL_MAP = {};
@@ -641,6 +656,13 @@ function matchTimePoint(targetMin, availableTimes) {
     for (const t of sorted) { if (targetMin <= t) return t; }
     return sorted[sorted.length - 1];
 }
+// ── 温补/浮充系数（规格书口径：以「电池块 = 8 单体串联, 15.2V」为基准；单体值 = 块值 ÷ 8 自动派生）──
+const TCV_BLOCK_25C = 15.2;            // 25℃ 单块温补充电电压 (V/块)
+const TCV_TEMP_COEF_BLOCK = 0.016;     // 温度系数 (V/℃/块)
+const FLOAT_OFFSET_BLOCK = 0.4;        // 浮充电压相对 TCV 的下调量 (V/块)
+const TCV_CELL_25C = TCV_BLOCK_25C / 8;             // 1.9 V/cell
+const TCV_TEMP_COEF_CELL = TCV_TEMP_COEF_BLOCK / 8; // 0.002 V/℃/cell
+const FLOAT_OFFSET_CELL = FLOAT_OFFSET_BLOCK / 8;   // 0.05 V/cell
 function calculate(inputs) {
     const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
     if (!model) throw new Error('Unknown model');
@@ -653,7 +675,8 @@ function calculate(inputs) {
     const upsVoltageLower = Number.isFinite(inputs.upsVoltageLower) ? inputs.upsVoltageLower : defaultUpsVoltageLower;
     const upsVoltageUpper = Number.isFinite(inputs.upsVoltageUpper) ? inputs.upsVoltageUpper : defaultUpsVoltageUpper;
     const batteryDischargeLower = inputs.epv * inputs.cellsPerString;
-    const temperatureCoefficient = 1.9 - 0.016 * (inputs.temperature - 25);
+    // 单体口径：TCV/cell = 1.9 − 0.002 × (T − 25℃)，等价于块级 (15.2 − 0.016×(T−25)) ÷ 8
+    const temperatureCoefficient = TCV_CELL_25C - TCV_TEMP_COEF_CELL * (inputs.temperature - 25);
     const batteryChargeUpper = temperatureCoefficient * inputs.cellsPerString;
     const vv = {
         upsVoltageLower, upsVoltageUpper, batteryDischargeLower, batteryChargeUpper,
@@ -684,7 +707,7 @@ function calculate(inputs) {
         ? inputs.blocksPerGroup
         : Math.ceil(inputs.cellsPerString / specs.cellsPerUnit);
     const configNominalVoltage = 13.2 * blocksPerGroup;
-    const configFloatVoltage = (temperatureCoefficient - 0.05) * inputs.cellsPerString;
+    const configFloatVoltage = (temperatureCoefficient - FLOAT_OFFSET_CELL) * inputs.cellsPerString;
     return {
         voltageValidation: vv, totalRequiredPower, autoRequiredPower, matchedEpvKey, matchedTime,
         wattPerCellLookup, powerPerUnit, unitsPerString, totalPowerPerString, totalProposedPower,
@@ -1183,7 +1206,7 @@ function recalculate() {
     sh('hintNominalVoltage',
         '13.2V × '+r.blocksPerGroup+'块 = '+fmt(r.configNominalVoltage,1)+' V');
     sh('hintFloatVoltage',
-        '('+fmt(r.temperatureCoefficient,3)+' −0.05) × '+inputs.cellsPerString+'节 = '+fmt(r.configFloatVoltage,1)+' V');
+        '('+fmt(r.temperatureCoefficient,3)+' −'+FLOAT_OFFSET_CELL+') × '+inputs.cellsPerString+'节 = '+fmt(r.configFloatVoltage,1)+' V');
 
     // ── Config Details ──
     document.getElementById('configDetails').innerHTML = [
@@ -1192,16 +1215,16 @@ function recalculate() {
         detailRow('单组电池块数', r.blocksPerGroup + ' blocks (节数 = ' + (r.blocksPerGroup * 8) + ')'),
         detailRow('配置总功率', fmt(r.totalProposedPower) + ' W'),
         detailRow('配置标称电压 (13.2V×块数)', fmt(r.configNominalVoltage, 1) + ' V'),
-        detailRow('配置浮充电压 (TCV−0.05)V×节数', fmt(r.configFloatVoltage, 1) + ' V'),
+        detailRow('配置浮充电压 (TCV/cell−0.05)×节数', fmt(r.configFloatVoltage, 1) + ' V'),
         detailRow('单电池尺寸 (L×W×H)', r.unitLength + ' × ' + r.unitWidth + ' × ' + r.unitHeight + ' m'),
         detailRow('电池总体积', fmt(r.totalVolume, 4) + ' m³'),
         detailRow('电池总数量', r.unitsPerString + ' × ' + inputs.numberOfStrings + ' = ' + r.totalQuantity + ' blocks'),
         detailRow('电池总重量 Total Weight', fmt(r.totalWeight, 1) + ' kg'),
         detailRow('系统总能量 Total Energy', fmt(r.totalEnergyKWh, 2) + ' kWh'),
-        detailRow('温度系数 TCV', fmt(r.temperatureCoefficient, 4) + ' (' + inputs.temperature + '℃)')
+        detailRow('温度补偿电压 TCV', fmt(r.temperatureCoefficient, 4) + ' V/cell（' + fmt(r.temperatureCoefficient * 8, 4) + ' V/块） @' + inputs.temperature + '℃')
     ].join('');
 
-    document.getElementById('tcvDisplay').textContent = fmt(r.temperatureCoefficient, 4);
+    document.getElementById('tcvDisplay').textContent = fmt(r.temperatureCoefficient, 4) + ' V/cell（' + fmt(r.temperatureCoefficient * 8, 4) + ' V/块）';
 
     // ── Current Config Copy Summary ──
     renderCopySummary(inputs, r);
@@ -1240,7 +1263,7 @@ function calculateCapacity(inputs) {
     const { specs } = model;
 
     // Step 1: total required battery power
-    const totalRequiredPower =
+    let totalRequiredPower =
         (inputs.requiredPowerMode === 'manual' && inputs.manualRequiredPower > 0)
             ? inputs.manualRequiredPower
             : (inputs.upsRatingKva * 1000 * inputs.powerFactor)
@@ -1250,7 +1273,13 @@ function calculateCapacity(inputs) {
 
     // Step 2: total energy required
     const backupTimeH   = inputs.backupTimeMin / 60;
-    const requiredWh    = totalRequiredPower * backupTimeH;
+    const isManualEnergy = inputs.requiredEnergyMode === 'manual' && Number.isFinite(inputs.manualRequiredEnergy) && inputs.manualRequiredEnergy > 0;
+    const requiredWh    = isManualEnergy ? inputs.manualRequiredEnergy : totalRequiredPower * backupTimeH;
+
+    // If manual energy specified and power mode is auto, derive required power from Wh / backupTimeH
+    if (isManualEnergy && inputs.requiredPowerMode !== 'manual' && backupTimeH > 0) {
+        totalRequiredPower = requiredWh / backupTimeH;
+    }
 
     // Step 3: string nominal voltage = 13.2 V × blocks per group
     const blocksPerGroup      = inputs.blocksPerGroup ||

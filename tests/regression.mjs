@@ -68,6 +68,36 @@ const CASES = [
             manualRequiredPower: 50000, blocksPerGroup: 18,
         },
     },
+    {
+        name: 'D 手动能量模式（8XNFG90 · 150000Wh · 10h/600min）',
+        inputs: {
+            batteryModelId: '8XNFG90', upsRatingKva: 200, systemVoltage: 480, powerFactor: 0.9,
+            inverterEfficiency: 0.95, agingFactor: 1, designMargin: 1, epv: 1.35, backupTimeMin: 600,
+            cellsPerString: 288, numberOfStrings: 2, temperature: 25, voltageRangePercent: 20,
+            upsVoltageLower: 384, upsVoltageUpper: 576, requiredPowerMode: 'auto',
+            requiredEnergyMode: 'manual', manualRequiredEnergy: 150000, blocksPerGroup: 36,
+        },
+    },
+    {
+        name: 'E 8XNFZ38 新增 15h/900min 档位（EPV 1.25 · 自动）',
+        inputs: {
+            batteryModelId: '8XNFZ38', upsRatingKva: 50, systemVoltage: 240, powerFactor: 0.9,
+            inverterEfficiency: 0.93, agingFactor: 1, designMargin: 1, epv: 1.25, backupTimeMin: 900,
+            cellsPerString: 144, numberOfStrings: 2, temperature: 25, voltageRangePercent: 15,
+            upsVoltageLower: 204, upsVoltageUpper: 276, requiredPowerMode: 'auto',
+            blocksPerGroup: 18,
+        },
+    },
+    {
+        name: 'F 8XNFZ38 新增 20h/1200min 档位 + 手动能量模式（EPV 1.40）',
+        inputs: {
+            batteryModelId: '8XNFZ38', upsRatingKva: 30, systemVoltage: 240, powerFactor: 0.85,
+            inverterEfficiency: 0.9, agingFactor: 1, designMargin: 1, epv: 1.40, backupTimeMin: 1200,
+            cellsPerString: 144, numberOfStrings: 3, temperature: 20, voltageRangePercent: 20,
+            upsVoltageLower: 192, upsVoltageUpper: 288, requiredPowerMode: 'auto',
+            requiredEnergyMode: 'manual', manualRequiredEnergy: 80000, blocksPerGroup: 18,
+        },
+    },
 ];
 
 /** 深度取平：把结果对象拍平为 key → value（嵌套一层） */

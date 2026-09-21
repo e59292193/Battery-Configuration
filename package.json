@@ -9,7 +9,7 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node --watch server/index.js",
-    "test": "node tests/regression.mjs"
+    "test": "node tests/regression.mjs && node tests/dc_ups_test.mjs"
   },
   "keywords": [
     "ni-zn",
