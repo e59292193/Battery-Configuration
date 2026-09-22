@@ -2233,6 +2233,7 @@ function recalculate() {
         inputs.requiredPowerMode = 'manual';
         inputs.manualRequiredEnergy = acDutySummary.batteryWh;
         inputs.requiredEnergyMode = 'manual';
+        refreshAcDutyDerived(acDutySummary);
     }
 
     if (calcMode !== 'dc') {
@@ -2363,7 +2364,13 @@ function recalculate() {
         const reqHint = document.getElementById('requiredPowerHint');
         const statReqPw = document.getElementById('statRequiredPower');
         if (statReqPw) statReqPw.innerHTML = fmt(r.totalRequiredPower / 1000, 2) + '<span class="stat-unit ml-1.5">kW</span>';
-        if (requiredPowerMode === 'auto') {
+        if (acDutySummary) {
+            // 工况表模式：功率来自工况表峰值段，与 UPS 额定容量无关，不能套用「UPS 额定 kVA × …」的文案
+            if (reqInput && document.activeElement !== reqInput) reqInput.value = (r.totalRequiredPower / 1000).toFixed(2);
+            if (reqHint) reqHint.textContent = '工况表峰值段 ' + fmt(acDutySummary.peakKva, 2) + ' kVA × PF ' + inputs.powerFactor
+                + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' × 老化 ' + inputs.agingFactor + ' × 余量 ' + inputs.designMargin
+                + ' = ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW（定容按 IEEE 485 分段法，不用此峰值×全程）';
+        } else if (requiredPowerMode === 'auto') {
             if (reqInput && document.activeElement !== reqInput) reqInput.value = (r.totalRequiredPower / 1000).toFixed(2);
             if (reqHint) reqHint.textContent = 'UPS ' + fmt(inputs.upsRatingKva, 0) + 'kVA × PF ' + inputs.powerFactor + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' × 老化 ' + inputs.agingFactor + ' × 余量 ' + inputs.designMargin + ' = ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW';
         } else {
@@ -2581,7 +2588,17 @@ function renderCapacityPanel(inputs, cr) {
     const autoWh = (inputs.upsRatingKva * 1000 * inputs.powerFactor / inputs.inverterEfficiency * (inputs.agingFactor || 1) * (inputs.designMargin || 1)) * (inputs.backupTimeMin / 60);
     lastAutoRequiredEnergy = autoWh;
 
-    if (requiredEnergyMode === 'auto') {
+    if (inputs.dutySteps && inputs.dutySteps.length) {
+        // 工况表模式：能量是各段「电池侧功率 × 段时长」之和，不是「峰值功率 × 总时长」
+        if (reqWhInput && document.activeElement !== reqWhInput) {
+            reqWhInput.value = Math.round(cr.requiredWh);
+        }
+        if (reqWhHint) {
+            reqWhHint.textContent = '工况表分段求和：'
+                + inputs.dutySteps.map(s => fmt(s.load / 1000, 2) + 'kW×' + fmt(s.durationMin / 60, 2) + 'h').join(' + ')
+                + ' = ' + fmt(cr.requiredWh, 0) + ' Wh';
+        }
+    } else if (requiredEnergyMode === 'auto') {
         if (reqWhInput && document.activeElement !== reqWhInput) {
             reqWhInput.value = Math.round(cr.requiredWh);
         }
@@ -2710,7 +2727,7 @@ function renderAcDutyTable() {
                     <input type="number" step="1" min="0.1" value="${step.durationMin}" class="inp text-xs py-0.5 px-1.5 w-16"
                         onchange="updateAcPeriod(${idx}, 'durationMin', this.value)">
                 </td>
-                <td class="py-1 px-2 font-mono text-[11px] text-ink3">${fmt(step.load / 1000, 2)} kW</td>
+                <td class="py-1 px-2 font-mono text-[11px] text-ink3" id="acDutyLoad${idx}">${fmt(step.load / 1000, 2)} kW</td>
                 <td class="py-1 px-2 text-right">
                     <button type="button" onclick="removeAcPeriod(${idx})" class="text-bad hover:underline text-[11px]" ${acDutyCycleList.length <= 1 ? 'disabled style="opacity:0.3"' : ''}>删除</button>
                 </td>
@@ -2724,6 +2741,22 @@ function renderAcDutyTable() {
     set('acDutyTotalMin', summary.totalMin.toFixed(1));
     set('acDutyTotalHours', (summary.totalMin / 60).toFixed(1));
     // 累计电量按电池侧口径（已含 PF / 逆变效率 / 老化 / 余量），与「需求总能量」完全一致
+    set('acDutyTotalKwh', (summary.batteryWh / 1000).toFixed(2));
+    set('acDutyPeakKva', summary.peakKva.toFixed(1));
+    set('acDutyPeakKw', (summary.peakBatteryW / 1000).toFixed(2));
+}
+
+// 只刷新工况表的派生列与汇总（不重建输入框，避免打断正在输入的单元格）。
+// PF / 逆变效率 / 老化系数 / 设计余量 变化时必须调用，否则「电池侧功率」列会停留在旧口径。
+function refreshAcDutyDerived(summary) {
+    if (typeof document === 'undefined' || !summary) return;
+    summary.steps.forEach((step, idx) => {
+        const cell = document.getElementById('acDutyLoad' + idx);
+        if (cell) cell.textContent = fmt(step.load / 1000, 2) + ' kW';
+    });
+    const set = (id, txt) => { const e = document.getElementById(id); if (e) e.textContent = txt; };
+    set('acDutyTotalMin', summary.totalMin.toFixed(1));
+    set('acDutyTotalHours', (summary.totalMin / 60).toFixed(1));
     set('acDutyTotalKwh', (summary.batteryWh / 1000).toFixed(2));
     set('acDutyPeakKva', summary.peakKva.toFixed(1));
     set('acDutyPeakKw', (summary.peakBatteryW / 1000).toFixed(2));
