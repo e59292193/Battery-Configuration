@@ -115,8 +115,24 @@ console.log(`  ✓ 峰值冲击校核: 单组峰值 ${res.peakCurrentPerString.t
 // 校验锌镍系统物理拓扑与能量 (已彻底移除铅酸对比)
 assert.equal(res.totalQuantity, 30, '总数量应为 30 块');
 assert.equal(res.totalWeight, 519, '总重量应为 30 * 17.3 = 519 kg');
-assert.equal(res.totalEnergyKWh.toFixed(1), '34.6', '标称系统能量应为 34.6 kWh');
+assert.equal(res.totalEnergyKWh.toFixed(1), '35.6', '标称系统能量应为 13.2V × 90Ah × 30块 = 35.6 kWh（与交流模式同口径）');
 console.log(`  ✓ 锌镍系统拓扑参数: 总数量 ${res.totalQuantity} 块 · 系统总净重 ${res.totalWeight} kg · 系统标称能量 ${res.totalEnergyKWh.toFixed(1)} kWh`);
+
+// 校验直流侧与交流侧的充电/浮充口径已统一到规格书温补电压
+assert.ok(Math.abs(res.tcvCell - (1.9 - 0.002 * (32 - 25))) < 1e-9, '均充应按温补 TCV/cell 计算');
+assert.equal(res.configEqualizeVoltage.toFixed(2), (res.cells * res.tcvCell).toFixed(2), '均充电压 = TCV × 节数');
+assert.equal(res.configFloatVoltage.toFixed(2), (res.cells * (res.tcvCell - 0.05)).toFixed(2), '浮充电压 = (TCV − 0.05) × 节数');
+assert.equal(res.chargeWithinBus, false, '80 节按 1.886V/cell 需 150.9V，超过 144V 母线上限，应识别为超限');
+console.log(`  ✓ 充放电压口径统一: 均充 ${res.configEqualizeVoltage.toFixed(1)}V / 浮充 ${res.configFloatVoltage.toFixed(1)}V @32℃ (母线上限 ${res.vMax}V → ${res.chargeWithinBus ? '在窗口内' : '超限告警'})`);
+
+// 校验分段法（恒流口径）已接入
+assert.ok(res.dcSection && res.dcSection.section >= 1, '阶梯工况应走 IEEE 485 分段法');
+assert.ok(res.recommendedStrings >= 1 && res.recommendedStrings <= res.strings, '分段法给出的最少组数应 ≤ 实配组数');
+console.log(`  ✓ IEEE 485 分段法: 控制段 Section ${res.dcSection.section}（累计 ${res.dcSection.sectionMinutes}min）→ 需 ${res.requiredStrings.toFixed(2)} 组，实配 ${res.strings} 组`);
+
+// 备电时间必须来自反查表，不是 时长 × 满足率
+assert.notEqual(res.estimatedRunTimeMin, res.totalDurationMin * res.satisfactionRatio, '备电时间不应再线性外推');
+console.log(`  ✓ 备电时间反查恒流表: ${res.estimatedRunTimeMin.toFixed(1)} min`);
 
 console.log('════════════════════════════════════════════════════════════════════════');
 console.log('交流模式智能推荐器与阶梯工况测试 (AC Recommender & Duty Cycle)');
@@ -135,6 +151,7 @@ const acInputPower = {
     designMargin: 1
 };
 const acRecPow = getRecommendedAcConfig(acInputPower, 'power');
+assert.equal(acRecPow.voltageWindowOk, true, '480V ±20% 窗口应可行');
 assert.equal(acRecPow.blocks, 36, '480V系统块数应推荐36块 (288节)');
 assert.equal(acRecPow.cells, 288, '36块对应288节');
 assert.equal(acRecPow.epv, 1.35, '截止电压应推荐1.35V');
@@ -158,22 +175,30 @@ assert.equal(acRecCap.strings, 5, '200kVA 60min容量模式推荐5组并联');
 assert.ok(acRecCap.satisfactionRatio >= 1.0, '容量模式推荐满足率应 >= 100%');
 console.log(`  ✓ 交流容量模式推荐: ${acRecCap.blocks} 块/组 (${acRecCap.cells} 节) · ${acRecCap.strings} 组并联 · EPV ${acRecCap.epv}V (满足率 ${(acRecCap.satisfactionRatio * 100).toFixed(1)}%)`);
 
+// 电压窗口不兼容时必须直接报错，而不是给出一个装得下的块数
+const acRecBad = getRecommendedAcConfig({
+    ...acInputPower, systemVoltage: 240, epv: 1.3,
+    upsVoltageLower: 199, upsVoltageUpper: 259.2, temperature: 32
+}, 'power');
+assert.equal(acRecBad.voltageWindowOk, false, 'AEG 60kVA 的 199~259.2V 窗口对锌镍不兼容，应识别出来');
+console.log(`  ✓ 电压窗口不兼容识别: ${acRecBad.voltageWindowNote}`);
+
 // 4. 测试交流阶梯负荷工况预设载入与核算
 console.log('\n4. 测试交流阶梯工况与典型项目预设:');
-loadAcDutyPreset(1); // 附件项目1: 152.5kW/60m + 13.1kW/480m
+loadAcDutyPreset(1); // 附件项目1（kVA 口径）: 161.0kVA/60m + 13.9kVA/480m
 const state1 = getAcState();
 assert.equal(state1.acLoadMode, 'duty', '工况模式应切换为 duty');
 assert.equal(state1.acDutyCycleList.length, 2, '项目1应有两个阶段');
 const totalTimeP1 = state1.acDutyCycleList.reduce((acc, c) => acc + c.durationMin, 0);
 assert.equal(totalTimeP1, 540, '项目1总时长应为 540 min (9h)');
-console.log(`  ✓ 载入项目1阶梯工况: 阶段1 152.5kW/60m + 阶段2 13.1kW/480m · 总时长 ${totalTimeP1} min (9.0h)`);
+console.log(`  ✓ 载入项目1阶梯工况: 阶段1 161.0kVA/60m + 阶段2 13.9kVA/480m · 总时长 ${totalTimeP1} min (9.0h)`);
 
-loadAcDutyPreset(2); // 附件项目2: 40.5kW/60m + 7.0kW/60m + 0.34kW/120m
+loadAcDutyPreset(2); // 附件项目2（kVA 口径）: 42.7 + 7.4 + 0.36 kVA
 const state2 = getAcState();
 assert.equal(state2.acDutyCycleList.length, 3, '项目2应有三个阶段');
 const totalTimeP2 = state2.acDutyCycleList.reduce((acc, c) => acc + c.durationMin, 0);
 assert.equal(totalTimeP2, 240, '项目2总时长应为 240 min (4h)');
-console.log(`  ✓ 载入项目2阶梯工况: 40.5kW/60m + 7.0kW/60m + 0.34kW/120m · 总时长 ${totalTimeP2} min (4.0h)`);
+console.log(`  ✓ 载入项目2阶梯工况: 42.7kVA/60m + 7.4kVA/60m + 0.36kVA/120m · 总时长 ${totalTimeP2} min (4.0h)`);
 
 console.log('\n────────────────────────────────────────────────────────────────────────');
 console.log('全部测试用例验证通过！100% 符合要求。');

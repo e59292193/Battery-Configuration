@@ -1,18 +1,19 @@
 /**
- * 回归测试：对比旧版 calc_w_v19.html 与新版 public/index.html 的计算引擎输出
- * 运行：npm test   （等价于 node tests/regression.mjs）
+ * 工程正确性测试（黄金用例）
+ * 运行：npm test
  *
- * 原理：两个 HTML 的引擎代码位于相同的分区注释之间
- *   （DATA LAYER → UI HELPERS，CAPACITY ENGINE → CAPACITY PANEL RENDERER），
- *   本脚本直接截取真实源码在 Node 中求值后逐字段比对，保证「所见即所测」。
+ * 旧版本只对比 legacy/calc_w_v19.html 与 public/index.html 是否「输出一致」，
+ * 这只能锁住行为、锁不住正确性 —— 旧版的老化系数方向错误、阶梯工况按峰值功率
+ * 放满全程、容量法用标称电压折算 Ah 等问题都会被一致性测试固化下来。
+ * 本文件改为直接校验物理口径，基准来自 HOPPECKE power-line designer (IEEE 485) 报告。
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import assert from 'node:assert/strict';
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-/** 从 HTML 源码中截取两个分区标记之间的引擎代码（含分区装饰行） */
 function sliceBetween(html, startMarker, endMarker, label) {
     const a = html.indexOf(startMarker);
     if (a < 0) throw new Error(`[${label}] 未找到起始标记: ${startMarker}`);
@@ -23,118 +24,147 @@ function sliceBetween(html, startMarker, endMarker, label) {
     return html.slice(start, end);
 }
 
-/** 加载某个 HTML 文件中的纯计算引擎 */
 function loadEngine(htmlPath, label) {
     const html = readFileSync(htmlPath, 'utf8');
-    const part1 = sliceBetween(html, '// DATA LAYER', '// UI HELPERS', label);          // BATTERY_MODELS + calculate
-    const part2 = sliceBetween(html, '// CAPACITY ENGINE', '// CAPACITY PANEL RENDERER', label); // calculateCapacity
+    const part1 = sliceBetween(html, '// DATA LAYER', '// UI HELPERS', label);
+    const part2 = sliceBetween(html, '// CAPACITY ENGINE', '// CAPACITY PANEL RENDERER', label);
     const code = part1 + '\n' + part2 + '\n' +
-        'return { BATTERY_MODELS, BATTERY_MODEL_MAP, matchEpvKey, matchTimePoint, calculate, calculateCapacity };';
+        'return { BATTERY_MODELS, BATTERY_MODEL_MAP, matchEpvKey, matchTimePoint, lookupCapability,' +
+        ' sizeDutyBySection, estimateRuntimeMin, avgCellVoltage, computeDutySummary,' +
+        ' calculate, calculateCapacity };';
     return new Function(code)();
 }
 
-const oldEngine = loadEngine(path.join(ROOT, 'legacy', 'calc_w_v19.html'), 'legacy');
-const newEngine = loadEngine(path.join(ROOT, 'public', 'index.html'), 'public');
+const E = loadEngine(path.join(ROOT, 'public', 'index.html'), 'public');
+const near = (a, b, tol) => Math.abs(a - b) <= tol;
 
-/** 回归用例（覆盖两种型号 / 自动与手动功率 / 长短备电 / 不同温度与电压窗口） */
-const CASES = [
-    {
-        name: 'A 默认参数（8XNFG90 · 200kVA · 15min · 自动）',
-        inputs: {
-            batteryModelId: '8XNFG90', upsRatingKva: 200, systemVoltage: 480, powerFactor: 0.9,
-            inverterEfficiency: 0.95, agingFactor: 1, designMargin: 1, epv: 1.35, backupTimeMin: 15,
-            cellsPerString: 290, numberOfStrings: 2, temperature: 20, voltageRangePercent: 20,
-            upsVoltageLower: 384, upsVoltageUpper: 576, requiredPowerMode: 'auto',
-            manualRequiredPower: NaN, blocksPerGroup: 37,
-        },
-    },
-    {
-        name: 'B 小型号长时（8XNFZ38 · 80kVA · 120min · 自动 · 35℃）',
-        inputs: {
-            batteryModelId: '8XNFZ38', upsRatingKva: 80, systemVoltage: 240, powerFactor: 0.8,
-            inverterEfficiency: 0.92, agingFactor: 0.95, designMargin: 1.1, epv: 1.3, backupTimeMin: 120,
-            cellsPerString: 145, numberOfStrings: 3, temperature: 35, voltageRangePercent: 15,
-            upsVoltageLower: 204, upsVoltageUpper: 276, requiredPowerMode: 'auto',
-            manualRequiredPower: NaN, blocksPerGroup: 19,
-        },
-    },
-    {
-        name: 'C 手动功率（8XNFG90 · 50000W · 30min · 0℃）',
-        inputs: {
-            batteryModelId: '8XNFG90', upsRatingKva: 120, systemVoltage: 240, powerFactor: 0.95,
-            inverterEfficiency: 0.9, agingFactor: 1, designMargin: 1.05, epv: 1.2, backupTimeMin: 30,
-            cellsPerString: 144, numberOfStrings: 4, temperature: 0, voltageRangePercent: 10,
-            upsVoltageLower: 216, upsVoltageUpper: 264, requiredPowerMode: 'manual',
-            manualRequiredPower: 50000, blocksPerGroup: 18,
-        },
-    },
-    {
-        name: 'D 手动能量模式（8XNFG90 · 150000Wh · 10h/600min）',
-        inputs: {
-            batteryModelId: '8XNFG90', upsRatingKva: 200, systemVoltage: 480, powerFactor: 0.9,
-            inverterEfficiency: 0.95, agingFactor: 1, designMargin: 1, epv: 1.35, backupTimeMin: 600,
-            cellsPerString: 288, numberOfStrings: 2, temperature: 25, voltageRangePercent: 20,
-            upsVoltageLower: 384, upsVoltageUpper: 576, requiredPowerMode: 'auto',
-            requiredEnergyMode: 'manual', manualRequiredEnergy: 150000, blocksPerGroup: 36,
-        },
-    },
-    {
-        name: 'E 8XNFZ38 新增 15h/900min 档位（EPV 1.25 · 自动）',
-        inputs: {
-            batteryModelId: '8XNFZ38', upsRatingKva: 50, systemVoltage: 240, powerFactor: 0.9,
-            inverterEfficiency: 0.93, agingFactor: 1, designMargin: 1, epv: 1.25, backupTimeMin: 900,
-            cellsPerString: 144, numberOfStrings: 2, temperature: 25, voltageRangePercent: 15,
-            upsVoltageLower: 204, upsVoltageUpper: 276, requiredPowerMode: 'auto',
-            blocksPerGroup: 18,
-        },
-    },
-    {
-        name: 'F 8XNFZ38 新增 20h/1200min 档位 + 手动能量模式（EPV 1.40）',
-        inputs: {
-            batteryModelId: '8XNFZ38', upsRatingKva: 30, systemVoltage: 240, powerFactor: 0.85,
-            inverterEfficiency: 0.9, agingFactor: 1, designMargin: 1, epv: 1.40, backupTimeMin: 1200,
-            cellsPerString: 144, numberOfStrings: 3, temperature: 20, voltageRangePercent: 20,
-            upsVoltageLower: 192, upsVoltageUpper: 288, requiredPowerMode: 'auto',
-            requiredEnergyMode: 'manual', manualRequiredEnergy: 80000, blocksPerGroup: 18,
-        },
-    },
+let pass = 0;
+const ok = (name, extra = '') => { pass++; console.log(`  ✓ ${name}${extra ? ' — ' + extra : ''}`); };
+
+console.log('═'.repeat(72));
+console.log('计算引擎工程正确性测试');
+console.log('═'.repeat(72));
+
+// ────────────────────────────────────────────────────────────────
+// 1. 老化系数必须放大需求（旧版写成除法，方向反了）
+// ────────────────────────────────────────────────────────────────
+console.log('1. 老化系数方向:');
+const baseInput = {
+    batteryModelId: '8XNFG90', upsRatingKva: 100, systemVoltage: 240, powerFactor: 0.9,
+    inverterEfficiency: 0.95, agingFactor: 1, designMargin: 1, epv: 1.3, backupTimeMin: 60,
+    cellsPerString: 144, numberOfStrings: 3, temperature: 25, voltageRangePercent: 20,
+    requiredPowerMode: 'auto', blocksPerGroup: 18
+};
+const r1 = E.calculate(baseInput);
+const r1Aged = E.calculate({ ...baseInput, agingFactor: 1.2 });
+assert.ok(near(r1.autoRequiredPower, 100000 * 0.9 / 0.95, 0.01), '基准需求功率');
+assert.ok(near(r1Aged.autoRequiredPower, r1.autoRequiredPower * 1.2, 0.01),
+    `老化 1.2 应放大需求 20%，实际 ${(r1Aged.autoRequiredPower / r1.autoRequiredPower).toFixed(3)}x`);
+ok('老化系数 1.2 → 需求功率 ×1.20', `${(r1.autoRequiredPower / 1000).toFixed(2)} kW → ${(r1Aged.autoRequiredPower / 1000).toFixed(2)} kW`);
+
+// ────────────────────────────────────────────────────────────────
+// 2. 阶梯工况：kVA → 电池侧能量口径必须自洽
+// ────────────────────────────────────────────────────────────────
+console.log('\n2. 工况 kVA → 电池侧能量口径:');
+const AEG_60 = [   // AEG 60kVA（HOPPECKE 报告：40493.3W×60m + 7027.66W×60m + 340.85W×120m）
+    { powerKva: 42.7, durationMin: 60 },
+    { powerKva: 7.4, durationMin: 60 },
+    { powerKva: 0.36, durationMin: 120 }
 ];
+const opt = { powerFactor: 0.9, inverterEfficiency: 0.95, agingFactor: 1, designMargin: 1 };
+const sum60 = E.computeDutySummary(AEG_60, opt);
+const manualWh = AEG_60.reduce((a, s) => a + s.powerKva * 1000 * 0.9 / 0.95 * (s.durationMin / 60), 0);
+assert.ok(near(sum60.batteryWh, manualWh, 0.01), '电池侧累计电量');
+assert.ok(near(sum60.acLoadWh, sum60.batteryWh * 0.95, 0.01), '交流侧能量 = 电池侧 × 逆变效率');
+assert.ok(near(sum60.steps[0].load, 40452.6, 1), `阶段1 电池侧功率应≈40.45kW，实际 ${sum60.steps[0].load.toFixed(1)}W`);
+ok('累计电量与电池侧所需能量一致', `${(sum60.batteryWh / 1000).toFixed(2)} kWh（交流侧 ${(sum60.acLoadWh / 1000).toFixed(2)} kWh）`);
 
-/** 深度取平：把结果对象拍平为 key → value（嵌套一层） */
-function flatten(obj, prefix = '') {
-    const out = {};
-    for (const [k, v] of Object.entries(obj)) {
-        const key = prefix ? `${prefix}.${k}` : k;
-        if (v !== null && typeof v === 'object') Object.assign(out, flatten(v, key));
-        else out[key] = v;
-    }
-    return out;
-}
+const capDuty = E.calculateCapacity({
+    ...baseInput, dutySteps: sum60.steps, backupTimeMin: sum60.totalMin,
+    requiredEnergyMode: 'manual', manualRequiredEnergy: sum60.batteryWh
+});
+assert.ok(near(capDuty.requiredWh, sum60.batteryWh, 0.01), '容量模式的需求总能量必须等于工况累计电量');
+ok('容量模式「需求总能量」= 工况「累计电量」', `${(capDuty.requiredWh / 1000).toFixed(2)} kWh`);
 
-let pass = 0, fail = 0;
-const rows = [];
+// ────────────────────────────────────────────────────────────────
+// 3. IEEE 485 分段法（对标 HOPPECKE AEG 60kVA 报告）
+// ────────────────────────────────────────────────────────────────
+console.log('\n3. IEEE 485 分段法 (AEG 60kVA · 4h 三段工况):');
+const row13 = E.BATTERY_MODEL_MAP['8XNFG90'].dischargeTable['1.30'];
+const sec = E.sizeDutyBySection(sum60.steps, row13);
+// 手算：Section1 285.7 / Section2 309.0 / Section3 317.5 节 → 控制段为 Section 3
+assert.equal(sec.section, 3, `控制段应为 Section 3，实际 Section ${sec.section}`);
+assert.ok(near(sec.requiredUnits, 317.5, 1.5), `所需电芯当量应≈317.5，实际 ${sec.requiredUnits.toFixed(1)}`);
+ok('控制段识别正确', `Section ${sec.section}（累计 ${sec.sectionMinutes} min）→ 需 ${sec.requiredUnits.toFixed(1)} 节`);
 
-for (const c of CASES) {
-    const ro = flatten(oldEngine.calculate(c.inputs));
-    const rn = flatten(newEngine.calculate(c.inputs));
-    const co = flatten(oldEngine.calculateCapacity(c.inputs));
-    const cn = flatten(newEngine.calculateCapacity(c.inputs));
+// 旧版做法（峰值功率放满全程）会算出 1081 节 ≈ 8 组，属于严重超配
+const naive = sum60.steps[0].load / row13[240];
+assert.ok(naive / sec.requiredUnits > 3, '旧版峰值法应显著超配');
+ok('避免「峰值功率×全程时长」超配', `旧法 ${naive.toFixed(0)} 节 vs 分段法 ${sec.requiredUnits.toFixed(0)} 节`);
 
-    const allKeys = new Set([...Object.keys(ro), ...Object.keys(rn), ...Object.keys(co), ...Object.keys(cn)]);
-    const diffs = [];
-    for (const k of allKeys) {
-        const a = ro[k] ?? co[k];
-        const b = rn[k] ?? cn[k];
-        if (String(a) !== String(b)) diffs.push(`${k}: old=${a} new=${b}`);
-    }
-    if (diffs.length === 0) { pass++; rows.push(`✓ ${c.name} — ${allKeys.size} 项结果完全一致`); }
-    else { fail++; rows.push(`✗ ${c.name} — 存在差异:\n    ` + diffs.join('\n    ')); }
-}
+const dutyInput = { ...baseInput, dutySteps: sum60.steps, backupTimeMin: sum60.totalMin };
+const r3 = E.calculate({ ...dutyInput, numberOfStrings: 3 });
+const r2 = E.calculate({ ...dutyInput, numberOfStrings: 2 });
+assert.ok(r3.satisfactionRatio >= 1, `18S3P 应满足，实际 ${(r3.satisfactionRatio * 100).toFixed(1)}%`);
+assert.ok(r2.satisfactionRatio < 1, `18S2P 应不满足，实际 ${(r2.satisfactionRatio * 100).toFixed(1)}%`);
+assert.equal(r3.recommendedStrings, 3, '最少并联组数应为 3');
+ok('18S3P 满足 / 18S2P 不满足', `${(r3.satisfactionRatio * 100).toFixed(1)}% vs ${(r2.satisfactionRatio * 100).toFixed(1)}%`);
 
-console.log('═'.repeat(72));
-console.log('回归测试：legacy/calc_w_v19.html ⇆ public/index.html 计算引擎对比');
-console.log('═'.repeat(72));
-rows.forEach(r => console.log(r));
+// 带老化 1.2 + 余量 1.1 后仍应成立（AEG 项目的正式口径）
+const r3Full = E.calculate({ ...dutyInput, numberOfStrings: 3, agingFactor: 1.2, designMargin: 1.1,
+    dutySteps: E.computeDutySummary(AEG_60, { ...opt, agingFactor: 1.2, designMargin: 1.1 }).steps });
+assert.ok(r3Full.satisfactionRatio >= 1, `含老化与余量后应仍满足，实际 ${(r3Full.satisfactionRatio * 100).toFixed(1)}%`);
+ok('含老化 1.2 × 余量 1.1 仍满足', `${(r3Full.satisfactionRatio * 100).toFixed(1)}%`);
+
+// ────────────────────────────────────────────────────────────────
+// 4. 功率法与容量法不得互相矛盾
+// ────────────────────────────────────────────────────────────────
+console.log('\n4. 功率法 ⇄ 容量法一致性:');
+const pw = E.calculate({ ...baseInput, numberOfStrings: 3 });
+const cp = E.calculateCapacity({ ...baseInput, numberOfStrings: 3 });
+const ratio = pw.satisfactionRatio / cp.capSatisfactionRatio;
+assert.ok(ratio > 0.9 && ratio < 1.1,
+    `同一输入两种模式满足率差异应 <10%，实际 ${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.capSatisfactionRatio * 100).toFixed(1)}%`);
+ok('恒定负荷下两种模式结论一致', `${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.capSatisfactionRatio * 100).toFixed(1)}%`);
+
+// ────────────────────────────────────────────────────────────────
+// 5. 备电时间必须反查表，不能线性外推
+// ────────────────────────────────────────────────────────────────
+console.log('\n5. 备电时间反查表:');
+const exact = E.calculate({ ...baseInput, backupTimeMin: 60, numberOfStrings: 1,
+    requiredPowerMode: 'manual', manualRequiredPower: row13[60] * 144 });
+assert.ok(near(exact.estimatedRunTime, 60, 2), `满足率 100% 时应≈60min，实际 ${exact.estimatedRunTime?.toFixed(1)}`);
+const half = E.calculate({ ...baseInput, backupTimeMin: 5, numberOfStrings: 1,
+    requiredPowerMode: 'manual', manualRequiredPower: row13[5] * 144 / 3 });
+const linear = 5 * 3; // 旧版：备电 × 满足率 = 15min
+assert.ok(half.estimatedRunTime > linear,
+    `短时档线性外推会低估，实际反查 ${half.estimatedRunTime?.toFixed(1)}min 应 > ${linear}min`);
+ok('短时档不再线性外推', `5min 档 1/3 负荷：线性外推 ${linear}min vs 反查 ${half.estimatedRunTime.toFixed(1)}min`);
+
+// ────────────────────────────────────────────────────────────────
+// 6. 查表越界必须告警（不能静默按边缘档位取值）
+// ────────────────────────────────────────────────────────────────
+console.log('\n6. 查表越界告警:');
+const overEpv = E.calculate({ ...baseInput, epv: 1.5 });
+assert.equal(overEpv.epvWarning, 'high', 'EPV 1.5 高于最高档 1.45，应告警');
+const overTime = E.calculate({ ...baseInput, backupTimeMin: 1500 });
+assert.equal(overTime.timeWarning, 'long', '1500min 超过最长档 1200min，应告警');
+const normal = E.calculate(baseInput);
+assert.equal(normal.epvWarning, null);
+assert.equal(normal.timeWarning, null);
+ok('EPV / 时长越界均能识别');
+
+// ────────────────────────────────────────────────────────────────
+// 7. Ah 折算必须用实际平均放电电压
+// ────────────────────────────────────────────────────────────────
+console.log('\n7. Ah 折算口径:');
+const avgV = E.avgCellVoltage(E.BATTERY_MODEL_MAP['8XNFG90'], '1.30', 240);
+assert.ok(avgV > 1.5 && avgV < 1.75, `平均放电电压应在 1.5~1.75V/cell，实际 ${avgV}`);
+assert.ok(Math.abs(avgV - 13.2 / 8) > 0.005, '不应等于标称 1.65V/cell');
+const capAh = E.calculateCapacity({ ...baseInput, numberOfStrings: 3 });
+const avgV60 = E.avgCellVoltage(E.BATTERY_MODEL_MAP['8XNFG90'], '1.30', 60);
+assert.ok(near(capAh.avgStringVoltage, avgV60 * 144, 0.01), '容量法应使用平均放电电压折算 Ah');
+ok('用恒功率表 ÷ 恒流表得到平均放电电压', `${avgV.toFixed(3)} V/cell @1.30V/240min`);
+
 console.log('─'.repeat(72));
-console.log(`结果: ${pass} 通过 / ${fail} 失败`);
-process.exit(fail ? 1 : 0);
+console.log(`结果: ${pass} 项断言组全部通过`);

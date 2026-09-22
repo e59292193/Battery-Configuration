@@ -72,12 +72,17 @@
 | 充电上限 | `batteryChargeUpper = TCV/cell × cellsPerString`（按电芯串数计算，4S2P 等型号自动正确） |
 | 浮充电压 | `configFloatVoltage = (TCV/cell − 0.05) × cellsPerString`，即块级 `TCV/块 − 0.4V` |
 | UPS 窗口 | `±voltageRangePercent%`；要求 放电下限 ≥ 窗口下限 且 充电上限 ≤ 窗口上限 |
-| 自动需求功率 | `upsRatingKva × 1000 × PF ÷ 逆变效率 ÷ 老化系数 × 设计余量` |
-| 功率法 | 查表（EPV、时间点就近取档，禁止插值）→ `满足率 = 总提供功率 ÷ 总需求功率`；`预估后备 = 备电 × 满足率` |
-| 容量法 | `requiredWh = 需求功率 × (min/60)`；`串联电压 = 13.2 × 块数`；`满足率 = 额定Ah ÷ 每串需求Ah` |
-| 硬性约束 | `cellsPerString` 必须是 8 的倍数；满足率 < 100% 必须警示 |
+| 自动需求功率 | `upsRatingKva × 1000 × PF ÷ 逆变效率 × 老化系数 × 设计余量`（老化系数**乘**，与 IEEE 485 一致） |
+| 工况表（多段负载） | 每段输入 **kVA**，折算电池侧功率 `kVA × 1000 × PF ÷ 逆变效率 × 老化系数 × 设计余量`；表内「累计电量」与「需求总能量」同口径 |
+| 分段选型（IEEE 485） | `sizeDutyBySection(steps,row)`：对第 1…N 段逐段累计，取**各断面所需电芯当量的最大值**作为控制断面；禁止用「峰值功率 × 全程时长」 |
+| 功率法 | 查表（EPV、时间点就近取档，禁止插值）→ `满足率 = 总提供功率 ÷ 总需求功率`；备电时间由恒功率表**反查插值** `estimateRuntimeMin()`，越界以 `<` / `>` 标注 |
+| 容量法 | 以恒功率表做**能量校核**；Ah 视图的平均单体电压取 `avgCellVoltage() = 恒功率表 ÷ 恒流表`，不再写死 13.2V |
+| 查表越界 | `lookupCapability()` / `epvOutOfRange()` 返回越界标记，UI 必须给出告警（`capLookupWarning`） |
+| 推荐器 | 块数同时受电压窗口约束：`maxBlocksByCharge`（充电上限）与 `minBlocksByDischarge`（放电下限）；无解时返回 `voltageWindowOk: false` |
+| DC 系统 | 能量统一按 13.2V 口径；浮充/均充电压由温补 TCV（1.9 / 1.85 V/cell）推导，超出母线窗口给 `chargeWithinBus` 告警；铅酸对比基准由需求能量推导（`VRLA_REF_WH_PER_KG=35`、`VRLA_REF_WH_PER_L=85`） |
+| 硬性约束 | `cellsPerString` 必须是 8 的倍数；满足率 < 100% 必须警示；切换 AC/DC 模式时电压窗口复位 |
 
-回归测试：`npm test` 对比 `legacy/calc_w_v19.html` 与 `public/index.html` 的引擎输出（3 组参数 × 39 项结果逐字段全等）。
+回归测试：`npm test` 运行 11 组工程正确性黄金用例（基准来自 HOPPECKE IEEE 485 选型报告，AEG 60kVA / 210kVA 工况），覆盖老化系数方向、分段选型控制断面、kVA 折算、反查备电时间、越界告警与电压窗口约束。
 
 ## DeepSeek API 与后端配置
 
