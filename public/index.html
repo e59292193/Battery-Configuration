@@ -1012,6 +1012,15 @@
                                     </div>
                                     <p class="stat-hint" id="requiredEnergyHint">按 电池总功率需求 × 备电时长(h) 自动计算</p>
                                 </div>
+                                <!-- 配置可提供能量（与需求对位） -->
+                                <div class="stat-card" id="cardProvidedEnergy">
+                                    <div class="mb-2 flex items-center gap-2 text-ink3">
+                                        <i data-lucide="battery-charging" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>
+                                        <span class="stat-title">配置可提供能量</span>
+                                    </div>
+                                    <p class="stat-value" id="statProvidedEnergy">—<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Wh</span></p>
+                                    <p class="stat-hint" id="hintProvidedEnergy">&mdash;</p>
+                                </div>
                                 <!-- 每块需求容量 -->
                                 <div class="stat-card">
                                     <div class="mb-2 flex items-center gap-2 text-ink3">
@@ -1168,9 +1177,9 @@
                         <!-- ── Hero metrics (3 cards) ───────────────────── -->
                         <div class="hero-grid grid grid-cols-3 gap-3">
                             <div id="heroSatisfaction" class="hero-card hero-ok">
-                                <p class="hero-label">容量满足率</p>
+                                <p class="hero-label">功率满足率</p>
                                 <p class="hero-value" id="heroSatisfactionValue">—<span class="ml-1 text-lg">%</span></p>
-                                <p class="hero-unit">Satisfaction</p>
+                                <p class="hero-unit">Power Satisfaction</p>
                             </div>
                             <div class="hero-card hero-info">
                                 <p class="hero-label">预估后备时间</p>
@@ -1205,6 +1214,15 @@
                                     <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-ink3">kW</span>
                                 </div>
                                 <p class="stat-hint" id="requiredPowerHint">按 UPS 容量×功率因数 ÷ 逆变效率 × 老化系数 × 设计余量 自动计算</p>
+                            </div>
+                            <!-- 配置可提供功率（与需求对位） -->
+                            <div class="stat-card" id="cardProposedPower">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="battery-charging" class="h-4 w-4"></i>
+                                    <span class="stat-title">配置可提供功率</span>
+                                </div>
+                                <p class="stat-value" id="statProposedPower">—<span class="stat-unit ml-1.5">kW</span></p>
+                                <p class="stat-hint" id="hintProposedPower">&mdash;</p>
                             </div>
                             <!-- 查表单节功率 -->
                             <div class="stat-card" id="cardWattPerCell">
@@ -2385,6 +2403,16 @@ function recalculate() {
         if (sPpu) sPpu.innerHTML = fmt(r.powerPerUnit) + '<span class="stat-unit ml-1.5">W</span>';
         const sPps = document.getElementById('statPowerPerString');
         if (sPps) sPps.innerHTML = fmt(r.totalPowerPerString / 1000, 2) + '<span class="stat-unit ml-1.5">kW</span>';
+        const sProp = document.getElementById('statProposedPower');
+        if (sProp) sProp.innerHTML = fmt(r.totalProposedPower / 1000, 2) + '<span class="stat-unit ml-1.5">kW</span>';
+        const hProp = document.getElementById('hintProposedPower');
+        if (hProp) {
+            const gapKw = (r.totalProposedPower - r.totalRequiredPower) / 1000;
+            hProp.textContent = fmt(r.totalPowerPerString / 1000, 2) + ' kW/组 × ' + inputs.numberOfStrings + '组 = '
+                + fmt(r.totalProposedPower / 1000, 2) + ' kW；对需求 ' + (gapKw >= 0 ? '+' : '') + fmt(gapKw, 2)
+                + ' kW → 功率满足率 ' + (r.satisfactionRatio * 100).toFixed(1) + '%';
+            hProp.style.color = r.satisfactionRatio >= 1 ? '' : 'rgb(var(--c-bad))';
+        }
         const sMc = document.getElementById('statMaxCurrent');
         if (sMc) sMc.innerHTML = fmt(r.maxCurrent) + '<span class="stat-unit ml-1.5">A</span>';
         const sMcps = document.getElementById('statMaxCurrentPerString');
@@ -2612,6 +2640,18 @@ function renderCapacityPanel(inputs, cr) {
             const diffWh = cr.requiredWh - autoWh;
             reqWhHint.innerHTML = '手动指定；自动计算值 ' + fmt(autoWh, 0) + ' Wh（差 ' + (diffWh >= 0 ? '+' : '') + fmt(diffWh, 0) + ' Wh）';
         }
+    }
+
+    // 配置可提供能量（恒功率表口径，与能量满足率同源）
+    const providedWh = (cr.whPerCell || 0) * (cr.totalCells || 0);
+    const statProvWh = document.getElementById('statProvidedEnergy');
+    if (statProvWh) statProvWh.innerHTML = fmt(providedWh, 0) + '<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Wh</span>';
+    const hintProvWh = document.getElementById('hintProvidedEnergy');
+    if (hintProvWh) {
+        hintProvWh.textContent = fmt(cr.wattPerCell, 1) + ' W/cell(@' + cr.matchedTime + 'min) × '
+            + fmt(cr.backupTimeH, 2) + 'h × ' + cr.totalCells + '节 = ' + fmt(providedWh, 0)
+            + ' Wh → 能量满足率 ' + (cr.energySatisfactionRatio * 100).toFixed(1) + '%';
+        hintProvWh.style.color = cr.energySatisfactionRatio >= 1 ? '' : 'rgb(var(--c-bad))';
     }
 
     // 每块需求容量
