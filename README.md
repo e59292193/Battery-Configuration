@@ -76,7 +76,7 @@
 | 工况表（多段负载） | 每段输入 **kVA**，折算电池侧功率 `kVA × 1000 × PF ÷ 逆变效率 × 老化系数 × 设计余量`；表内「累计电量」与「需求总能量」同口径 |
 | 分段选型（IEEE 485） | `sizeDutyBySection(steps,row)`：对第 1…N 段逐段累计，取**各断面所需电芯当量的最大值**作为控制断面；禁止用「峰值功率 × 全程时长」 |
 | 功率法 | 查表（EPV、时间点就近取档，禁止插值）→ `满足率 = 总提供功率 ÷ 总需求功率`；备电时间由恒功率表**反查插值** `estimateRuntimeMin()`，越界以 `<` / `>` 标注 |
-| 容量法 | 以恒功率表做**能量校核**；Ah 视图的平均单体电压取 `avgCellVoltage() = 恒功率表 ÷ 恒流表`，不再写死 13.2V |
+| 容量法（能量满足率）| 以恒功率表做**能量校核**；Ah 视图的平均单体电压取 `avgCellVoltage() = 恒功率表 ÷ 恒流表`，不再写死 13.2V |
 | 查表越界 | `lookupCapability()` / `epvOutOfRange()` 返回越界标记，UI 必须给出告警（`capLookupWarning`） |
 | 推荐器 | 块数同时受电压窗口约束：`maxBlocksByCharge`（充电上限）与 `minBlocksByDischarge`（放电下限）；无解时返回 `voltageWindowOk: false` |
 | DC 系统 | 能量统一按 13.2V 口径；浮充/均充电压由温补 TCV（1.9 / 1.85 V/cell）推导，超出母线窗口给 `chargeWithinBus` 告警；铅酸对比基准由需求能量推导（`VRLA_REF_WH_PER_KG=35`、`VRLA_REF_WH_PER_L=85`） |

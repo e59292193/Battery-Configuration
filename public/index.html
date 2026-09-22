@@ -974,9 +974,9 @@
                             <!-- Hero row -->
                             <div class="hero-grid grid grid-cols-3 gap-3 mb-3">
                                 <div id="capHeroSatCard" class="hero-card hero-ok">
-                                    <p class="hero-label">容量满足率</p>
+                                    <p class="hero-label">能量满足率</p>
                                     <p class="hero-value" id="capHeroSatVal">—<span class="ml-1 text-lg">%</span></p>
-                                    <p class="hero-unit">Capacity Satisfaction</p>
+                                    <p class="hero-unit">Energy Satisfaction</p>
                                 </div>
                                 <div class="hero-card hero-info">
                                     <p class="hero-label">预估后备时间</p>
@@ -1016,7 +1016,7 @@
                                 <div class="stat-card">
                                     <div class="mb-2 flex items-center gap-2 text-ink3">
                                         <i data-lucide="battery" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>
-                                        <span class="stat-title">每块需求容量</span>
+                                        <span class="stat-title">每块需求容量（参考）</span>
                                     </div>
                                     <p class="stat-value" id="statCapReqAh">—<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Ah</span></p>
                                     <p class="stat-hint" id="hintCapReqAh">&mdash;</p>
@@ -1025,7 +1025,7 @@
                                 <div class="stat-card">
                                     <div class="mb-2 flex items-center gap-2 text-ink3">
                                         <i data-lucide="battery-full" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>
-                                        <span class="stat-title">配置提供容量（每块）</span>
+                                        <span class="stat-title">配置提供容量（每块，参考）</span>
                                     </div>
                                     <p class="stat-value" id="statCapProvAh">—<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Ah</span></p>
                                     <p class="stat-hint" id="hintCapProvAh">&mdash;</p>
@@ -1034,7 +1034,7 @@
                                 <div class="stat-card">
                                     <div class="mb-2 flex items-center gap-2 text-ink3">
                                         <i data-lucide="layers" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>
-                                        <span class="stat-title">配置提供总容量</span>
+                                        <span class="stat-title">配置提供总容量（参考）</span>
                                     </div>
                                     <p class="stat-value" id="statCapTotalAh">—<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Ah</span></p>
                                     <p class="stat-hint" id="hintCapTotalAh">&mdash;</p>
@@ -2076,7 +2076,7 @@ function buildConfigSummary(inputs, r, dc) {
         '配置总功率: ' + fmt(r.totalProposedPower / 1000, 2) + ' kW (' + fmt(r.totalProposedPower, 0) + ' W)',
         '电池最大放电电流: ' + fmt(r.maxCurrent) + ' A',
         '单组最大电流: ' + fmt(r.maxCurrentPerString) + ' A',
-        '容量满足率: ' + (r.satisfactionRatio * 100).toFixed(1) + ' %',
+        '功率满足率: ' + (r.satisfactionRatio * 100).toFixed(1) + ' %',
         '预估后备时间: ' + fmt(r.estimatedRunTime) + ' 分钟',
         '系统总能量: ' + fmt(r.totalEnergyKWh, 2) + ' kWh'
     ];
@@ -2143,7 +2143,7 @@ function exportConfigTable() {
         { label: '配置总功率', value: fmt(r.totalProposedPower / 1000, 2) + ' kW', highlight: true },
         { label: '电池最大放电电流', value: fmt(r.maxCurrent, 1) + ' A', highlight: true },
         { label: '单组最大电流', value: fmt(r.maxCurrentPerString, 1) + ' A', highlight: true },
-        { label: '容量满足率', value: (r.satisfactionRatio * 100).toFixed(1) + ' %', highlight: true },
+        { label: '功率满足率', value: (r.satisfactionRatio * 100).toFixed(1) + ' %', highlight: true },
         { label: '系统总能量', value: fmt(r.totalEnergyKWh, 2) + ' kWh', highlight: false },
     ];
     const rowsHtml = rows.map(row => {
@@ -2515,7 +2515,8 @@ function calculateCapacity(inputs) {
     const whPerCell        = look.value * backupTimeH;
     const totalCells       = inputs.cellsPerString * (inputs.numberOfStrings || 1);
     const requiredCells    = whPerCell > 0 ? requiredWh / whPerCell : 0;
-    const capSatisfactionRatio = requiredCells > 0 ? totalCells / requiredCells : 0;
+    // 本质是能量比（需求 Wh ÷ 恒功率表可放出 Wh），以「电芯当量个数」表达；Ah 仅作对比铅酸的参考视图
+    const energySatisfactionRatio = requiredCells > 0 ? totalCells / requiredCells : 0;
     const recommendedStrings   = (requiredCells > 0 && inputs.cellsPerString > 0)
         ? Math.ceil(requiredCells / inputs.cellsPerString) : 0;
 
@@ -2547,7 +2548,8 @@ function calculateCapacity(inputs) {
         stringNominalVoltage, blocksPerGroup,
         requiredAhPerString, requiredAhTotal,
         providedAhPerString, providedAhTotal,
-        capSatisfactionRatio, estimatedRunTimeMin,
+        energySatisfactionRatio, capSatisfactionRatio: energySatisfactionRatio, // 旧字段名保留兼容
+        estimatedRunTimeMin,
         maxCurrent, maxCurrentPerString,
         totalEnergyKWh, totalWeight, totalQuantity,
         // 新增：能量校核口径
@@ -2562,7 +2564,7 @@ function calculateCapacity(inputs) {
 // CAPACITY PANEL RENDERER
 // ══════════════════════════════════════════════════════════════════
 function renderCapacityPanel(inputs, cr) {
-    const sat    = cr.capSatisfactionRatio;
+    const sat    = cr.energySatisfactionRatio;
     const satPct = (sat * 100).toFixed(1);
     const ok     = sat >= 1;
 
@@ -2622,7 +2624,7 @@ function renderCapacityPanel(inputs, cr) {
     const statCapProvAh = document.getElementById('statCapProvAh');
     if (statCapProvAh) statCapProvAh.innerHTML = fmt(cr.providedAhPerString, 0) + '<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Ah</span>';
     const hintCapProvAh = document.getElementById('hintCapProvAh');
-    if (hintCapProvAh) hintCapProvAh.textContent = inputs.batteryModelId + ' 额定 = ' + fmt(cr.providedAhPerString, 0) + ' Ah/块';
+    if (hintCapProvAh) hintCapProvAh.textContent = inputs.batteryModelId + ' 额定 = ' + fmt(cr.providedAhPerString, 0) + ' Ah/块（判据为能量满足率，Ah 仅供与铅酸方案对比）';
 
     // 配置提供总容量
     const statCapTotalAh = document.getElementById('statCapTotalAh');
@@ -3536,7 +3538,7 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
                     `= <b>${fmt(cr.whPerCell, 1)} Wh/cell</b>`),
                 capStep('Step 4', '所需电芯当量与满足率',
                     `${fmt(rWh, 0)} Wh ÷ ${fmt(cr.whPerCell, 1)} Wh/cell = ${fmt(cr.requiredCells, 1)} 节，实配 ${cr.totalCells} 节`,
-                    `满足率 = <b>${(cr.capSatisfactionRatio * 100).toFixed(1)}%</b>（最少需 <b>${cr.recommendedStrings}</b> 组并联）`),
+                    `能量满足率 = <b>${(cr.energySatisfactionRatio * 100).toFixed(1)}%</b>（最少需 <b>${cr.recommendedStrings}</b> 组并联）`),
                 capStep('Step 5', 'Ah 视图（按实际平均放电电压折算）',
                     `${fmt(rWh, 0)} Wh ÷ (${fmt(cr.avgCellVoltage, 3)} V/cell × ${inputs.cellsPerString} 节) ÷ ${inputs.numberOfStrings} 组`,
                     `= 需求 <b>${fmt(rAh, 2)} Ah/串</b> vs 额定 <b>${pAh} Ah/串</b>`),
@@ -3565,7 +3567,7 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
                     `= <b>${fmt(cr.whPerCell, 1)} Wh/cell</b>`),
                 capStep('Step 4', '所需电芯当量与满足率',
                     `${fmt(rWh, 0)} Wh ÷ ${fmt(cr.whPerCell, 1)} Wh/cell = ${fmt(cr.requiredCells, 1)} 节，实配 ${cr.totalCells} 节`,
-                    `满足率 = <b>${(cr.capSatisfactionRatio * 100).toFixed(1)}%</b>（最少需 <b>${cr.recommendedStrings}</b> 组并联）`),
+                    `能量满足率 = <b>${(cr.energySatisfactionRatio * 100).toFixed(1)}%</b>（最少需 <b>${cr.recommendedStrings}</b> 组并联）`),
                 capStep('Step 5', 'Ah 视图（按实际平均放电电压折算）',
                     `${fmt(rWh, 0)} Wh ÷ (${fmt(cr.avgCellVoltage, 3)} V/cell × ${inputs.cellsPerString} 节) ÷ ${inputs.numberOfStrings} 组`,
                     `= 需求 <b>${fmt(rAh, 2)} Ah/串</b> vs 额定 <b>${pAh} Ah/串</b>`),
@@ -4501,7 +4503,7 @@ function buildSystemPrompt() {
     s += '7. 功率法：unitsPerString = cellsPerString / 8；powerPerUnit = wattPerCell × 8；totalPowerPerString = wattPerCell × cellsPerString；totalProposedPower = totalPowerPerString × numberOfStrings；requiredCells = totalRequiredPower / wattPerCell；satisfactionRatio = (cellsPerString × numberOfStrings) / requiredCells；maxCurrent = totalRequiredPower / (epv × cellsPerString)；maxCurrentPerString = maxCurrent / numberOfStrings。\n';
     s += '7b. 阶梯工况（Duty Cycle）：工况表输入单位为交流视在功率 kVA，每段电池侧功率 = kVA × 1000 × powerFactor / inverterEfficiency × agingFactor × designMargin；累计电量即电池侧所需能量。定容必须用 IEEE 485 分段法：对每个「累计到第 S 段结束」的时刻计算 requiredUnits(S) = Σ(i=1..S) (P_i − P_{i−1}) / 能力(T_S − t_{i−1})，取各段最大值；严禁用「峰值功率 × 全程时长」或「平均功率」代替。\n';
     s += '7c. 预估后备时间：用单节实际功率反查恒功率表并在相邻档位间插值，严禁用 backupTimeMin × satisfactionRatio 线性外推。\n';
-    s += '8. 容量法（能量校核口径）：requiredWh = totalRequiredPower × (backupTimeMin/60)（手动模式可直接指定需求能量 Wh 反推功率）；whPerCell = 该 EPV 与时长档位的 wattPerCell × (backupTimeMin/60)；requiredCells = requiredWh / whPerCell；capSatisfactionRatio = (cellsPerString × numberOfStrings) / requiredCells。Ah 视图按实际平均放电电压折算：avgCellVoltage = 恒功率表值 ÷ 恒流表同档位值，requiredAhPerString = requiredWh / (avgCellVoltage × cellsPerString) / numberOfStrings；严禁用标称 13.2V 折算 Ah。\n';
+    s += '8. 容量法（能量校核口径）：requiredWh = totalRequiredPower × (backupTimeMin/60)（手动模式可直接指定需求能量 Wh 反推功率）；whPerCell = 该 EPV 与时长档位的 wattPerCell × (backupTimeMin/60)；requiredCells = requiredWh / whPerCell；energySatisfactionRatio = (cellsPerString × numberOfStrings) / requiredCells（这是能量满足率，不是 Ah 容量比；Ah 视图仅用于与铅酸方案横向对比，不作判据）。Ah 视图按实际平均放电电压折算：avgCellVoltage = 恒功率表值 ÷ 恒流表同档位值，requiredAhPerString = requiredWh / (avgCellVoltage × cellsPerString) / numberOfStrings；严禁用标称 13.2V 折算 Ah。\n';
     s += '9. 配置电压：configNominalVoltage = 13.2 × blocksPerGroup；configFloatVoltage = (temperatureCoefficient - 0.05) × cellsPerString（等价于块级 TCV − 0.4V）。\n';
     s += '10. 数量与重量：totalQuantity = unitsPerString × numberOfStrings；totalWeight = totalQuantity × 单块重量；totalEnergyKWh = 13.2 × 额定Ah × totalQuantity / 1000。\n';
     s += '11. 硬性约束：cellsPerString 必须是 8 的整数倍；满足率 satisfactionRatio 建议 ≥ 1.0（低于 1.0 必须明确警示）；块数必须同时满足电压窗口 —— 充电上限 temperatureCoefficient × cellsPerString ≤ upsVoltageUpper 且 放电下限 epv × cellsPerString ≥ upsVoltageLower，两者无解时必须直接报「电压窗口不兼容」而不是给出配置；EPV 高于放电表最高档或放电时长超过最长档时表内无数据，必须告警而不是按边缘档位取值。所有推荐方案必须严格符合上述计算规则，计算结果须能在本页面复算一致。\n\n';

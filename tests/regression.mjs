@@ -122,10 +122,10 @@ ok('含老化 1.2 × 余量 1.1 仍满足', `${(r3Full.satisfactionRatio * 100).
 console.log('\n4. 功率法 ⇄ 容量法一致性:');
 const pw = E.calculate({ ...baseInput, numberOfStrings: 3 });
 const cp = E.calculateCapacity({ ...baseInput, numberOfStrings: 3 });
-const ratio = pw.satisfactionRatio / cp.capSatisfactionRatio;
+const ratio = pw.satisfactionRatio / cp.energySatisfactionRatio;
 assert.ok(ratio > 0.9 && ratio < 1.1,
-    `同一输入两种模式满足率差异应 <10%，实际 ${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.capSatisfactionRatio * 100).toFixed(1)}%`);
-ok('恒定负荷下两种模式结论一致', `${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.capSatisfactionRatio * 100).toFixed(1)}%`);
+    `同一输入两种模式满足率差异应 <10%，实际 ${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.energySatisfactionRatio * 100).toFixed(1)}%`);
+ok('恒定负荷下两种模式结论一致', `${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.energySatisfactionRatio * 100).toFixed(1)}%`);
 
 // ────────────────────────────────────────────────────────────────
 // 5. 备电时间必须反查表，不能线性外推
