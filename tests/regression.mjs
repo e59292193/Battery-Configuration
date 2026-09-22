@@ -30,7 +30,7 @@ function loadEngine(htmlPath, label) {
     const part2 = sliceBetween(html, '// CAPACITY ENGINE', '// CAPACITY PANEL RENDERER', label);
     const code = part1 + '\n' + part2 + '\n' +
         'return { BATTERY_MODELS, BATTERY_MODEL_MAP, matchEpvKey, matchTimePoint, lookupCapability,' +
-        ' sizeDutyBySection, estimateRuntimeMin, avgCellVoltage, computeDutySummary,' +
+        ' sizeDutyBySection, computeDutyChecks, estimateRuntimeMin, avgCellVoltage, computeDutySummary,' +
         ' calculate, calculateCapacity };';
     return new Function(code)();
 }
@@ -165,6 +165,32 @@ const capAh = E.calculateCapacity({ ...baseInput, numberOfStrings: 3 });
 const avgV60 = E.avgCellVoltage(E.BATTERY_MODEL_MAP['8XNFG90'], '1.30', 60);
 assert.ok(near(capAh.avgStringVoltage, avgV60 * 144, 0.01), '容量法应使用平均放电电压折算 Ah');
 ok('用恒功率表 ÷ 恒流表得到平均放电电压', `${avgV.toFixed(3)} V/cell @1.30V/240min`);
+
+// ────────────────────────────────────────────────────────────────
+// 8. 交叉校核：三个口径同源，分段满足率为判据
+// ────────────────────────────────────────────────────────────────
+console.log('\n8. 交叉校核 computeDutyChecks:');
+{
+    const row = E.BATTERY_MODEL_MAP['8XNFG90'].dischargeTable['1.35'];
+    const steps = [{ load: 49060, durationMin: 60 }, { load: 8500, durationMin: 60 }, { load: 410, durationMin: 120 }];
+    const dc = E.computeDutyChecks(steps, row, 138 * 3);
+    assert.ok(near(dc.energyRatio * 100, 105.5, 0.3), `能量满足率 ${(dc.energyRatio*100).toFixed(1)}`);
+    assert.ok(near(dc.peakRatio * 100, 119.5, 0.3), `峰值段功率满足率 ${(dc.peakRatio*100).toFixed(1)}`);
+    assert.ok(near(dc.sectionRatio * 100, 106.6, 0.3), `分段满足率 ${(dc.sectionRatio*100).toFixed(1)}`);
+    assert.equal(dc.peakLookupMin, 60, '峰值段必须按自身时长查表，不能用全程时长');
+    assert.equal(dc.section.sections.length, 3, '应给出全部断面明细');
+    assert.equal(dc.section.section, 3, '控制断面应为断面 3');
+    ok('三口径同源', `能量 ${(dc.energyRatio*100).toFixed(1)}% / 峰值 ${(dc.peakRatio*100).toFixed(1)}% / 分段 ${(dc.sectionRatio*100).toFixed(1)}%`);
+}
+{
+    // 峰值在尾：「能量 / 峰值 取小」会高估配置能力，分段法必须更严格
+    const row = E.BATTERY_MODEL_MAP['8XNFG90'].dischargeTable['1.45'];
+    const steps = [{ load: 5000, durationMin: 180 }, { load: 50000, durationMin: 60 }];
+    const dc = E.computeDutyChecks(steps, row, 1000);
+    const naive = Math.min(dc.energyRatio, dc.peakRatio);
+    assert.ok(dc.sectionRatio < naive, `分段满足率应低于「能量/峰值取小」，实际 ${(dc.sectionRatio*100).toFixed(1)}% vs ${(naive*100).toFixed(1)}%`);
+    ok('峰值在尾时分段法更严格', `分段 ${(dc.sectionRatio*100).toFixed(1)}% < 取小 ${(naive*100).toFixed(1)}%`);
+}
 
 console.log('─'.repeat(72));
 console.log(`结果: ${pass} 项断言组全部通过`);

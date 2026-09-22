@@ -803,6 +803,7 @@
                                     <label class="lbl" for="cellsPerString">单组电芯总节数</label>
                                     <input type="number" id="cellsPerString" value="290" step="8" min="8" class="inp">
                                     <p class="hint">自动默认: ⌊系统电压 / 1.65⌋ = <span id="autoCellsDisplay">290</span> 节 · 与块数联动 (节数 = 块数×8)</p>
+                                    <p class="hint" id="cellsMultipleWarn" style="display:none;color:rgb(var(--c-bad))"></p>
                                 </div>
                                 <!-- Number of Strings (groups) -->
                                 <div class="space-y-1">
@@ -1012,6 +1013,15 @@
                                     </div>
                                     <p class="stat-hint" id="requiredEnergyHint">按 电池总功率需求 × 备电时长(h) 自动计算</p>
                                 </div>
+                                <!-- 交叉校核（阶梯工况时显示） -->
+                                <div class="stat-card" id="capCardDutyAudit" style="display:none">
+                                    <div class="mb-2 flex items-center gap-2 text-ink3">
+                                        <i data-lucide="list-checks" class="h-4 w-4" style="color:rgb(var(--c-ok))"></i>
+                                        <span class="stat-title">交叉校核（能量 / 峰值功率 / 分段）</span>
+                                    </div>
+                                    <p class="stat-value" id="capStatDutyAudit">—</p>
+                                    <p class="stat-hint" id="capHintDutyAudit">&mdash;</p>
+                                </div>
                                 <!-- 配置可提供能量（与需求对位） -->
                                 <div class="stat-card" id="cardProvidedEnergy">
                                     <div class="mb-2 flex items-center gap-2 text-ink3">
@@ -1214,6 +1224,15 @@
                                     <span class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-sm font-medium text-ink3">kW</span>
                                 </div>
                                 <p class="stat-hint" id="requiredPowerHint">按 UPS 容量×功率因数 ÷ 逆变效率 × 老化系数 × 设计余量 自动计算</p>
+                            </div>
+                            <!-- 交叉校核（阶梯工况时显示） -->
+                            <div class="stat-card" id="cardDutyAudit" style="display:none">
+                                <div class="mb-2 flex items-center gap-2 text-ink3">
+                                    <i data-lucide="list-checks" class="h-4 w-4"></i>
+                                    <span class="stat-title">交叉校核（能量 / 峰值功率 / 分段）</span>
+                                </div>
+                                <p class="stat-value" id="statDutyAudit">—</p>
+                                <p class="stat-hint" id="hintDutyAudit">&mdash;</p>
                             </div>
                             <!-- 配置可提供功率（与需求对位） -->
                             <div class="stat-card" id="cardProposedPower">
@@ -1584,6 +1603,59 @@ function lookupCapability(row, minutes) {
  * 取各段最大值。后段功率下降时 (P_i − P_{i−1}) 为负，自动把前面多算的部分扣回来。
  * 返回所需「单位数」：交流模式为电芯当量数，直流模式为并联组数。
  */
+/**
+ * 工况交叉校核：在同一套配置上，同时给出三个口径的满足率。
+ *  - sectionRatio 分段满足率：IEEE 485 判据，同时覆盖能量与功率，定容以它为准
+ *  - peakRatio    峰值段功率满足率：只看最大功率段本身能不能扛住（等价于「峰值段就是第 1 段」时的断面 1）
+ *  - energyRatio  能量满足率：只看总能量够不够，不区分负载出现的时刻
+ * 峰值段能力按「峰值段自身时长」查表；若用全程时长查表会严重低估，切勿混用。
+ */
+function computeDutyChecks(steps, row, totalCells) {
+    const valid = (steps || []).filter(s => (parseFloat(s.durationMin) || 0) > 0);
+    if (!valid.length || !(totalCells > 0)) return null;
+    const totalMin = valid.reduce((a, s) => a + (parseFloat(s.durationMin) || 0), 0);
+    const requiredWh = valid.reduce((a, s) => a + (parseFloat(s.load) || 0) * (parseFloat(s.durationMin) || 0) / 60, 0);
+    const peak = valid.reduce((a, s) => ((parseFloat(s.load) || 0) > (parseFloat(a.load) || 0) ? s : a), valid[0]);
+    const peakLook = lookupCapability(row, parseFloat(peak.durationMin) || 0);
+    const peakProvidedW = peakLook.value * totalCells;
+    const totalLook = lookupCapability(row, totalMin);
+    const providedWh = totalLook.value * (totalMin / 60) * totalCells;
+    const section = sizeDutyBySection(valid, row);
+    return {
+        totalMin, requiredWh, providedWh,
+        energyRatio: requiredWh > 0 ? providedWh / requiredWh : 0,
+        peakLoadW: parseFloat(peak.load) || 0, peakDurationMin: parseFloat(peak.durationMin) || 0,
+        peakLookupMin: peakLook.time, peakCapability: peakLook.value, peakProvidedW,
+        peakRatio: (parseFloat(peak.load) || 0) > 0 ? peakProvidedW / (parseFloat(peak.load) || 0) : 0,
+        section,
+        sectionRatio: section && section.requiredUnits > 0 ? totalCells / section.requiredUnits : 0
+    };
+}
+
+// 渲染交叉校核卡片：同一套配置下的三个口径满足率，判据是分段满足率
+function renderDutyAudit(dc, valId, hintId, cardId) {
+    const card = document.getElementById(cardId);
+    const valEl = document.getElementById(valId);
+    const hintEl = document.getElementById(hintId);
+    if (!card || !valEl || !hintEl) return;
+    if (!dc || !dc.section) { card.style.display = 'none'; return; }
+    card.style.display = '';
+    const pct = x => (x * 100).toFixed(1) + '%';
+    const bad = 'rgb(var(--c-bad))', okc = 'rgb(var(--c-ok))';
+    const mark = x => '<span style="color:' + (x >= 1 ? okc : bad) + '">' + pct(x) + '</span>';
+    valEl.innerHTML = '能量 ' + mark(dc.energyRatio)
+        + ' <span class="text-ink3">/</span> 峰值 ' + mark(dc.peakRatio)
+        + ' <span class="text-ink3">/</span> <b>分段 ' + mark(dc.sectionRatio) + '</b>';
+    const secTxt = dc.section.sections.map(x =>
+        '断面' + x.section + '(' + x.sectionMinutes + 'min) 需 ' + x.requiredUnits.toFixed(1) + ' 节'
+        + (x.section === dc.section.section ? ' <b>←控制</b>' : '')
+    ).join(' · ');
+    hintEl.innerHTML = '峰值段 ' + fmt(dc.peakLoadW / 1000, 2) + ' kW/' + dc.peakDurationMin + 'min：配置可给 '
+        + fmt(dc.peakProvidedW / 1000, 2) + ' kW（' + fmt(dc.peakCapability, 1) + ' W/cell @' + dc.peakLookupMin + 'min）<br>'
+        + '分段法逐断面：' + secTxt + '<br>'
+        + '<b>定容以分段满足率为准</b>（已同时覆盖能量与峰值功率）';
+}
+
 function sizeDutyBySection(steps, row) {
     const valid = (steps || []).filter(s => (parseFloat(s.durationMin) || 0) > 0);
     if (!valid.length) return null;
@@ -1592,6 +1664,7 @@ function sizeDutyBySection(steps, row) {
     valid.forEach(s => { acc += parseFloat(s.durationMin) || 0; ends.push(acc); });
     let best = null;
     let outOfRange = null;
+    const sections = [];
     for (let S = 0; S < valid.length; S++) {
         const sectionMinutes = ends[S];
         let requiredUnits = 0;
@@ -1607,9 +1680,11 @@ function sizeDutyBySection(steps, row) {
             requiredUnits += units;
             terms.push({ period: i + 1, deltaLoad, remainingMin, lookupMin: look.time, capability: look.value, units });
         }
+        sections.push({ section: S + 1, sectionMinutes, requiredUnits });
         if (!best || requiredUnits > best.requiredUnits) best = { requiredUnits, section: S + 1, sectionMinutes, terms };
     }
     best.outOfRange = outOfRange;
+    best.sections = sections;
     return best;
 }
 /** 反查表估算可支撑时间：在相邻档位之间按「能力 → 时长」线性插值（替代旧版「满足率 × 备电时间」线性外推） */
@@ -1736,6 +1811,7 @@ function calculate(inputs) {
         requiredCells = wattPerCellLookup > 0 ? totalRequiredPower / wattPerCellLookup : 0;
     }
 
+    const dutyChecks = isDuty ? computeDutyChecks(dutySteps, tableRow, totalCells) : null;
     const unitsPerString = inputs.cellsPerString / specs.cellsPerUnit;
     const powerPerUnit = wattPerCellLookup * specs.cellsPerUnit;
     const totalPowerPerString = wattPerCellLookup * inputs.cellsPerString;
@@ -1767,7 +1843,7 @@ function calculate(inputs) {
         totalVolume, temperatureCoefficient, totalEnergyKWh,
         blocksPerGroup, configNominalVoltage, configFloatVoltage,
         // 新增：分段法结果、所需电芯当量、查表越界告警、后备时间边界标记
-        isDuty, dutySection, requiredCells, totalCells, recommendedStrings,
+        isDuty, dutySection, dutyChecks, requiredCells, totalCells, recommendedStrings,
         estimatedRunTimeBound, epvWarning, timeWarning,
         configChargeVoltage: batteryChargeUpper
     };
@@ -2403,6 +2479,20 @@ function recalculate() {
         if (sPpu) sPpu.innerHTML = fmt(r.powerPerUnit) + '<span class="stat-unit ml-1.5">W</span>';
         const sPps = document.getElementById('statPowerPerString');
         if (sPps) sPps.innerHTML = fmt(r.totalPowerPerString / 1000, 2) + '<span class="stat-unit ml-1.5">kW</span>';
+        const cmw = document.getElementById('cellsMultipleWarn');
+        if (cmw) {
+            const n = inputs.cellsPerString, b = inputs.blocksPerGroup;
+            const msgs = [];
+            if (n % 8 !== 0) msgs.push('节数必须是 8 的整数倍（1 块 = 8 单体），当前 ' + n + ' 节 → 应取 ' + (Math.ceil(n / 8) * 8) + ' 节');
+            else if (b > 0 && n !== b * 8) msgs.push('节数与块数不一致：' + b + ' 块 × 8 = ' + (b * 8) + ' 节，当前填 ' + n + ' 节');
+            cmw.textContent = msgs.join('；');
+            cmw.style.display = msgs.length ? '' : 'none';
+        }
+        renderDutyAudit(r.dutyChecks, 'statDutyAudit', 'hintDutyAudit', 'cardDutyAudit');
+        const heroSatLabel = document.querySelector('#heroSatisfaction .hero-label');
+        const heroSatUnit = document.querySelector('#heroSatisfaction .hero-unit');
+        if (heroSatLabel) heroSatLabel.textContent = r.isDuty ? '分段满足率' : '功率满足率';
+        if (heroSatUnit) heroSatUnit.textContent = r.isDuty ? 'IEEE 485 Section Method' : 'Power Satisfaction';
         const sProp = document.getElementById('statProposedPower');
         if (sProp) sProp.innerHTML = fmt(r.totalProposedPower / 1000, 2) + '<span class="stat-unit ml-1.5">kW</span>';
         const hProp = document.getElementById('hintProposedPower');
@@ -2557,6 +2647,9 @@ function calculateCapacity(inputs) {
     const providedAhPerString  = specs.ratedCapacityAh;   // 串联不改变 Ah
     const providedAhTotal      = providedAhPerString * (inputs.numberOfStrings || 1);
 
+    const dutyChecks = (inputs.dutySteps && inputs.dutySteps.length)
+        ? computeDutyChecks(inputs.dutySteps, tableRow, totalCells) : null;
+
     // 预估可支撑时间：反查恒功率表，不再用满足率线性外推
     const runtime              = estimateRuntimeMin(totalCells > 0 ? totalRequiredPower / totalCells : 0, tableRow);
     const estimatedRunTimeMin  = runtime.minutes;
@@ -2577,6 +2670,7 @@ function calculateCapacity(inputs) {
         requiredAhPerString, requiredAhTotal,
         providedAhPerString, providedAhTotal,
         energySatisfactionRatio, capSatisfactionRatio: energySatisfactionRatio, // 旧字段名保留兼容
+        dutyChecks,
         estimatedRunTimeMin,
         maxCurrent, maxCurrentPerString,
         totalEnergyKWh, totalWeight, totalQuantity,
@@ -2641,6 +2735,8 @@ function renderCapacityPanel(inputs, cr) {
             reqWhHint.innerHTML = '手动指定；自动计算值 ' + fmt(autoWh, 0) + ' Wh（差 ' + (diffWh >= 0 ? '+' : '') + fmt(diffWh, 0) + ' Wh）';
         }
     }
+
+    renderDutyAudit(cr.dutyChecks, 'capStatDutyAudit', 'capHintDutyAudit', 'capCardDutyAudit');
 
     // 配置可提供能量（恒功率表口径，与能量满足率同源）
     const providedWh = (cr.whPerCell || 0) * (cr.totalCells || 0);

@@ -80,7 +80,8 @@
 | 查表越界 | `lookupCapability()` / `epvOutOfRange()` 返回越界标记，UI 必须给出告警（`capLookupWarning`） |
 | 推荐器 | 块数同时受电压窗口约束：`maxBlocksByCharge`（充电上限）与 `minBlocksByDischarge`（放电下限）；无解时返回 `voltageWindowOk: false` |
 | DC 系统 | 能量统一按 13.2V 口径；浮充/均充电压由温补 TCV（1.9 / 1.85 V/cell）推导，超出母线窗口给 `chargeWithinBus` 告警；铅酸对比基准由需求能量推导（`VRLA_REF_WH_PER_KG=35`、`VRLA_REF_WH_PER_L=85`） |
-| 硬性约束 | `cellsPerString` 必须是 8 的倍数；满足率 < 100% 必须警示；切换 AC/DC 模式时电压窗口复位 |
+| 交叉校核 | `computeDutyChecks(steps,row,totalCells)` 在同一配置上给出三个口径：**能量满足率**（总能量够不够）、**峰值段功率满足率**（峰值段按**自身时长**查表，禁止用全程时长）、**分段满足率**（IEEE 485 判据，定容以它为准）。「能量够 + 峰值够」不等价于分段法通过，峰值在工况尾部时会低估 |
+| 硬性约束 | `cellsPerString` 必须是 8 的倍数；满足率 < 100% 必须警示；切换 AC/DC 模式时电压窗口复位；节数非 8 的倍数或与块数不一致时必须告警 |
 
 回归测试：`npm test` 运行 11 组工程正确性黄金用例（基准来自 HOPPECKE IEEE 485 选型报告，AEG 60kVA / 210kVA 工况），覆盖老化系数方向、分段选型控制断面、kVA 折算、反查备电时间、越界告警与电压窗口约束。
 
