@@ -1622,6 +1622,7 @@ function computeDutyChecks(steps, row, totalCells) {
     const providedWh = totalLook.value * (totalMin / 60) * totalCells;
     const section = sizeDutyBySection(valid, row);
     return {
+        singleStep: valid.length === 1,
         totalMin, requiredWh, providedWh,
         energyRatio: requiredWh > 0 ? providedWh / requiredWh : 0,
         peakLoadW: parseFloat(peak.load) || 0, peakDurationMin: parseFloat(peak.durationMin) || 0,
@@ -1653,7 +1654,9 @@ function renderDutyAudit(dc, valId, hintId, cardId) {
     hintEl.innerHTML = '峰值段 ' + fmt(dc.peakLoadW / 1000, 2) + ' kW/' + dc.peakDurationMin + 'min：配置可给 '
         + fmt(dc.peakProvidedW / 1000, 2) + ' kW（' + fmt(dc.peakCapability, 1) + ' W/cell @' + dc.peakLookupMin + 'min）<br>'
         + '分段法逐断面：' + secTxt + '<br>'
-        + '<b>定容以分段满足率为准</b>（已同时覆盖能量与峰值功率）';
+        + (dc.singleStep
+            ? '恒定负荷为单一恒功率段，三个口径在数学上等价，三个数字应当一致'
+            : '<b>定容以分段满足率为准</b>（已同时覆盖能量与峰值功率；「能量够 + 峰值够」不等于分段法通过）');
 }
 
 function sizeDutyBySection(steps, row) {
@@ -1811,7 +1814,9 @@ function calculate(inputs) {
         requiredCells = wattPerCellLookup > 0 ? totalRequiredPower / wattPerCellLookup : 0;
     }
 
-    const dutyChecks = isDuty ? computeDutyChecks(dutySteps, tableRow, totalCells) : null;
+    const dutyChecks = computeDutyChecks(
+        isDuty ? dutySteps : [{ load: totalRequiredPower, durationMin: inputs.backupTimeMin }],
+        tableRow, totalCells);
     const unitsPerString = inputs.cellsPerString / specs.cellsPerUnit;
     const powerPerUnit = wattPerCellLookup * specs.cellsPerUnit;
     const totalPowerPerString = wattPerCellLookup * inputs.cellsPerString;
@@ -2647,8 +2652,11 @@ function calculateCapacity(inputs) {
     const providedAhPerString  = specs.ratedCapacityAh;   // 串联不改变 Ah
     const providedAhTotal      = providedAhPerString * (inputs.numberOfStrings || 1);
 
-    const dutyChecks = (inputs.dutySteps && inputs.dutySteps.length)
-        ? computeDutyChecks(inputs.dutySteps, tableRow, totalCells) : null;
+    const dutyChecks = computeDutyChecks(
+        (inputs.dutySteps && inputs.dutySteps.length)
+            ? inputs.dutySteps
+            : [{ load: totalRequiredPower, durationMin: inputs.backupTimeMin }],
+        tableRow, totalCells);
 
     // 预估可支撑时间：反查恒功率表，不再用满足率线性外推
     const runtime              = estimateRuntimeMin(totalCells > 0 ? totalRequiredPower / totalCells : 0, tableRow);
@@ -3574,6 +3582,37 @@ function renderDcPanel(inputs, d) {
 // ══════════════════════════════════════════════════════════════════
 // CALCULATION STEPS RENDERER
 // ══════════════════════════════════════════════════════════════════
+/**
+ * 「三口径满足率」计算步骤块。三者分子分母全部写出，避免只看一个百分比误判。
+ *  - 能量满足率：全程时长档能力 × 全程时长 × 总节数 ÷ 工况总能量
+ *  - 峰值段功率满足率：峰值段时长档能力 × 总节数 ÷ 峰值段功率（必须按峰值段自身时长查表）
+ *  - 分段满足率：总节数 ÷ IEEE 485 各断面所需节数的最大值  ← 定容判据
+ */
+function satisfactionSteps(stepFn, label, dc, totalCells) {
+    if (!dc || !dc.section) return '';
+    const p = x => (x * 100).toFixed(1) + '%';
+    const ctrl = dc.section;
+    const secList = ctrl.sections.map(x =>
+        `断面${x.section}(${x.sectionMinutes}min) 需 ${fmt(x.requiredUnits, 1)} 节${x.section === ctrl.section ? ' <b>←控制</b>' : ''}`
+    ).join('　');
+    const formula = [
+        `<u>① 能量满足率</u>　配置可提供能量 ÷ 需求总能量`,
+        `　= (${fmt(dc.providedWh / (dc.totalMin / 60) / totalCells, 1)} W/cell @${dc.totalMin}min × ${(dc.totalMin / 60).toFixed(2)} h × ${totalCells} 节) ÷ ${fmt(dc.requiredWh, 0)} Wh`,
+        `　= ${fmt(dc.providedWh, 0)} Wh ÷ ${fmt(dc.requiredWh, 0)} Wh = <b>${p(dc.energyRatio)}</b>`,
+        `<u>② 峰值段功率满足率</u>　配置可提供功率 ÷ 峰值段功率　<span class="text-ink3">（按峰值段自身时长 ${dc.peakDurationMin}min 查表，不能用全程时长）</span>`,
+        `　= (${fmt(dc.peakCapability, 1)} W/cell @${dc.peakLookupMin}min × ${totalCells} 节) ÷ ${fmt(dc.peakLoadW / 1000, 2)} kW`,
+        `　= ${fmt(dc.peakProvidedW / 1000, 2)} kW ÷ ${fmt(dc.peakLoadW / 1000, 2)} kW = <b>${p(dc.peakRatio)}</b>`,
+        `<u>③ 分段满足率（IEEE 485 判据）</u>　实配节数 ÷ 各断面所需节数的最大值`,
+        `　${secList}`,
+        `　= ${totalCells} 节 ÷ ${fmt(ctrl.requiredUnits, 1)} 节 = <b>${p(dc.sectionRatio)}</b>`
+    ].join('<br>');
+    const verdict = dc.singleStep
+        ? `恒定负荷是单一恒功率段，三个口径数学上等价，应当一致`
+        : `<b>以 ③ 分段满足率为准</b>：① 忽略负载出现的时刻，② 只看峰值那一段；两者都通过也不代表 ③ 通过`;
+    return stepFn(label, '三口径满足率', formula,
+        `能量 <b>${p(dc.energyRatio)}</b> / 峰值 <b>${p(dc.peakRatio)}</b> / 分段 <b>${p(dc.sectionRatio)}</b> — ${verdict}`);
+}
+
 function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
     const isPower = (calcMode === 'power');
     const isCap   = (calcMode === 'capacity');
@@ -3622,7 +3661,8 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
                     `单组可提供 <b>${fmt(r.totalPowerPerString / 1000, 2)} kW</b>，全系统 <b>${fmt(r.totalProposedPower / 1000, 2)} kW</b>`),
                 powerStep('Step 6', '峰值段最大放电电流',
                     `${fmt(np, 0)} W ÷ (${inputs.epv}V × ${cps} 节)`,
-                    `= <b>${fmt(r.maxCurrent, 1)} A</b> 总 / <b>${fmt(r.maxCurrentPerString, 1)} A</b> 每组`)
+                    `= <b>${fmt(r.maxCurrent, 1)} A</b> 总 / <b>${fmt(r.maxCurrentPerString, 1)} A</b> 每组`),
+                satisfactionSteps(powerStep, 'Step 7', r.dutyChecks, r.totalCells)
             ].join('');
         } else {
             title.textContent = '计算步骤详解 (功率验证模式)';
@@ -3648,7 +3688,8 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
                     `满足率 = ${fmt(r.totalProposedPower / 1000, 2)} kW ÷ ${fmt(np / 1000, 2)} kW = <b>${(r.satisfactionRatio * 100).toFixed(1)}%</b>（所需 ${fmt(r.requiredCells, 1)} 节，最少 ${r.recommendedStrings} 组）`),
                 powerStep('Step 6', '最大放电电流',
                     `${fmt(np, 0)} W ÷ (${inputs.epv}V × ${cps} 节)`,
-                    `= <b>${fmt(r.maxCurrent, 1)} A</b> 总 / <b>${fmt(r.maxCurrentPerString, 1)} A</b> 每组`)
+                    `= <b>${fmt(r.maxCurrent, 1)} A</b> 总 / <b>${fmt(r.maxCurrentPerString, 1)} A</b> 每组`),
+                satisfactionSteps(powerStep, 'Step 7', r.dutyChecks, r.totalCells)
             ].join('');
         }
     } else if (isCap && cr) {
@@ -3664,7 +3705,7 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
             const dutyStagesText = acDutySummary.steps.map((st, i) => `[阶${i+1}] ${st.apparentKva}kVA×${st.durationMin}m`).join(' + ');
             el.innerHTML = [
                 capStep('Step 1', '交流阶梯工况累计电量需求',
-                    `${dutyStagesText} → 基础耗电 ${fmt(acDutySummary.totalRawWh / 1000, 2)} kWh`,
+                    `${dutyStagesText} → 交流侧耗电 ${fmt(acDutySummary.acLoadWh / 1000, 2)} kWh`,
                     `= 考虑效率及余量后总需 <b>${fmt(rWh / 1000, 2)} kWh</b> (${fmt(rWh, 0)} Wh)`),
                 capStep('Step 2', '等效持续放电功率',
                     `${fmt(rWh, 0)} Wh ÷ ${bth.toFixed(4)} h (${acDutySummary.totalMin} min)`,
@@ -3680,7 +3721,8 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
                     `= 需求 <b>${fmt(rAh, 2)} Ah/串</b> vs 额定 <b>${pAh} Ah/串</b>`),
                 capStep('Step 6', '预估可支撑时间（反查恒功率表）',
                     `单节实际功率 ${fmt(cr.totalRequiredPower / cr.totalCells, 2)} W/cell → 表内插值`,
-                    `= <b>${formatRuntime(cr.estimatedRunTimeMin, cr.estimatedRunTimeBound)} min</b>`)
+                    `= <b>${formatRuntime(cr.estimatedRunTimeMin, cr.estimatedRunTimeBound)} min</b>`),
+                satisfactionSteps(capStep, 'Step 7', cr.dutyChecks, cr.totalCells)
             ].join('');
         } else {
             title.textContent = '计算步骤详解 (容量验证模式)';
@@ -3709,7 +3751,8 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
                     `= 需求 <b>${fmt(rAh, 2)} Ah/串</b> vs 额定 <b>${pAh} Ah/串</b>`),
                 capStep('Step 6', '预估可支撑时间（反查恒功率表）',
                     `单节实际功率 ${fmt(cr.totalRequiredPower / cr.totalCells, 2)} W/cell → 表内插值`,
-                    `= <b>${formatRuntime(cr.estimatedRunTimeMin, cr.estimatedRunTimeBound)} min</b>`)
+                    `= <b>${formatRuntime(cr.estimatedRunTimeMin, cr.estimatedRunTimeBound)} min</b>`),
+                satisfactionSteps(capStep, 'Step 7', cr.dutyChecks, cr.totalCells)
             ].join('');
         }
     } else if (isDc && dcResult) {
