@@ -60,9 +60,12 @@ console.log('1. 测试智能母线块数推荐算法:');
 const rec110 = getRecommendedDcBlocks(110.4, 144.0);
 assert.equal(rec110.blocks, 10, '110V系统应推荐10块');
 assert.equal(rec110.cells, 80, '10块对应80节');
-assert.equal(rec110.cellDis.toFixed(2), '1.38', '单体放电截止应为 1.38V');
+assert.equal(rec110.cellDis.toFixed(2), '1.38', 'UPS 母线下限折算应为 1.38V/cell');
+assert.equal(rec110.epv.toFixed(2), '1.40', '推荐截止电压必须命中恒流表 1.40V 档');
+assert.equal(rec110.matchedEpvKey, '1.40', '推荐查表行必须为 1.40V');
+assert.equal(rec110.batteryDischargeLower.toFixed(1), '112.0', '1.40V×80节对应电池截止母线112.0V');
 assert.equal(rec110.cellChg.toFixed(2), '1.80', '单体充电上限应为 1.80V');
-console.log('  ✓ 110V母线 (110.4V~144V) → 推荐 10 块 (80 节, 1.38V/1.80V)');
+console.log('  ✓ 110V母线 (110.4V~144V) → 推荐 10 块 (80 节), 恒流表EPV 1.40V（截止母线112.0V）');
 
 const rec220 = getRecommendedDcBlocks(198.0, 260.0);
 assert.equal(rec220.blocks, 18, '220V系统应推荐18块');
@@ -159,6 +162,22 @@ assert.equal(acRecPow.epv, 1.35, '截止电压应推荐1.35V');
 assert.equal(acRecPow.strings, 2, '200kVA 15min应推荐2组并联');
 assert.ok(acRecPow.satisfactionRatio >= 1.0, '推荐配置满足率应达到或超过100%');
 console.log(`  ✓ 交流功率模式推荐: ${acRecPow.blocks} 块/组 (${acRecPow.cells} 节) · ${acRecPow.strings} 组并联 · EPV ${acRecPow.epv}V (满足率 ${(acRecPow.satisfactionRatio * 100).toFixed(1)}%)`);
+
+// 推荐 EPV 必须是规格表真实行：1.44V 不得原样进入推荐结果
+const acRecSnapG90 = getRecommendedAcConfig({ ...acInputPower, epv: 1.44 }, 'power');
+assert.equal(acRecSnapG90.epv, 1.45, '8XNFG90 输入1.44V应向上取恒功率表1.45V档');
+assert.equal(acRecSnapG90.epvAdjusted, true, '非表格档位应标记为已调整');
+assert.ok(Object.hasOwn(BATTERY_MODEL_MAP['8XNFG90'].dischargeTable, acRecSnapG90.epv.toFixed(2)),
+    'G90推荐EPV必须存在于恒功率表');
+const acRecSnapZ38 = getRecommendedAcConfig({ ...acInputPower, batteryModelId: '8XNFZ38', epv: 1.44 }, 'power');
+assert.equal(acRecSnapZ38.epv, 1.40, '8XNFZ38最高仅有1.40V档，推荐不得输出1.44V');
+assert.ok(Object.hasOwn(BATTERY_MODEL_MAP['8XNFZ38'].dischargeTable, acRecSnapZ38.epv.toFixed(2)),
+    'Z38推荐EPV必须存在于恒功率表');
+const dcRecZ38 = getRecommendedDcBlocks(110.4, 144.0, 25, '8XNFZ38');
+assert.equal(dcRecZ38.epv, 1.40, '直流推荐必须命中8XNFZ38恒流表1.40V档');
+assert.ok(Object.hasOwn(BATTERY_MODEL_MAP['8XNFZ38'].constantCurrentTable, dcRecZ38.epv.toFixed(2)),
+    '直流推荐EPV必须存在于恒流表');
+console.log('  ✓ 非表格EPV约束: G90 1.44→1.45；Z38 1.44→1.40；交流/直流推荐均只输出真实表格行');
 
 const acInputCap = {
     systemVoltage: 480,
