@@ -22,6 +22,19 @@ router.post('/chat', async (req, res, next) => {
     if (!Array.isArray(messages) || messages.length === 0) {
         return next(httpError(400, 'BAD_REQUEST', 'messages 不能为空。'));
     }
+    // 模型名格式 + 可选白名单：防止任意模型名/参数注入消耗额度
+    if (typeof model !== 'string' || !/^[A-Za-z0-9._-]{1,64}$/.test(model)) {
+        return next(httpError(400, 'BAD_MODEL', 'model 不合法。'));
+    }
+    if (env.modelAllowlist.length && !env.modelAllowlist.includes(model)) {
+        return next(httpError(400, 'MODEL_NOT_ALLOWED', `模型 ${model} 不在服务端白名单内。`));
+    }
+    // 消息体积上限：上下文是主要成本来源，超限直接拒绝
+    let approxChars = 0;
+    try { approxChars = JSON.stringify(messages).length; } catch { approxChars = Infinity; }
+    if (approxChars > env.maxMessagesChars) {
+        return next(httpError(413, 'MESSAGES_TOO_LARGE', '消息体积超过上限（约 3MB），请清空历史或缩减附件后重试。'));
+    }
 
     const start = Date.now();
     const upstreamAbort = new AbortController();

@@ -31,7 +31,7 @@ function loadEngine(htmlPath, label) {
     const code = part1 + '\n' + part2 + '\n' +
         'return { BATTERY_MODELS, BATTERY_MODEL_MAP, matchEpvKey, matchTimePoint, lookupCapability,' +
         ' sizeDutyBySection, computeDutyChecks, estimateRuntimeMin, avgCellVoltage, computeDutySummary,' +
-        ' calculate, calculateCapacity };';
+        ' epvOutOfRange, calculate, calculateCapacity };';
     return new Function(code)();
 }
 
@@ -190,6 +190,70 @@ console.log('\n8. 交叉校核 computeDutyChecks:');
     const naive = Math.min(dc.energyRatio, dc.peakRatio);
     assert.ok(dc.sectionRatio < naive, `分段满足率应低于「能量/峰值取小」，实际 ${(dc.sectionRatio*100).toFixed(1)}% vs ${(naive*100).toFixed(1)}%`);
     ok('峰值在尾时分段法更严格', `分段 ${(dc.sectionRatio*100).toFixed(1)}% < 取小 ${(naive*100).toFixed(1)}%`);
+}
+
+// ────────────────────────────────────────────────────────────────
+// 9. 反查表必须按 ln P – ln t 双对数插值（普通线性插值在凸曲线上系统性高估）
+// ────────────────────────────────────────────────────────────────
+console.log('\n9. 备电时间反查为 log-log 插值:');
+{
+    // 8XNFG90 @1.30V：20min→398.1 W/cell，30min→274.9 W/cell；取 335.67 W/cell
+    const rt = E.estimateRuntimeMin(1007.0 / 3, row13);
+    const linear = 20 + (398.1 - 335.67) / (398.1 - 274.9) * 10;   // 旧线性口径 ≈ 25.07
+    assert.ok(rt.minutes > 20 && rt.minutes < 30, `插值结果必须落在 20~30min 之间，实际 ${rt.minutes.toFixed(2)}`);
+    assert.ok(rt.minutes < linear - 0.5, `log-log 应明显小于线性插值（凸曲线），实际 ${rt.minutes.toFixed(2)} vs ${linear.toFixed(2)}`);
+    assert.ok(near(rt.minutes, 24.10, 0.15), `log-log 理论值 ≈24.10min，实际 ${rt.minutes.toFixed(2)}`);
+    // 能量单调性：插值结果对应的 P×t 不得超过 30min 档允许能量
+    assert.ok(335.67 * rt.minutes <= 274.9 * 30 * 1.001, '插值能量不得超下一档允许能量');
+    ok('log-log 插值落在物理合理区间', `335.7W/cell → ${rt.minutes.toFixed(1)}min（线性口径 ${linear.toFixed(1)}min 偏乐观）`);
+}
+
+// ────────────────────────────────────────────────────────────────
+// 10. 越界标记完整性：短时冲击段与 EPV 低于最低档都必须显式标记
+// ────────────────────────────────────────────────────────────────
+console.log('\n10. 查表越界标记完整性:');
+{
+    const shortLook = E.lookupCapability(row13, 1);
+    assert.equal(shortLook.outOfRange, 'short', '1min 冲击段应标记 short（按 5min 档取值偏保守）');
+    assert.equal(shortLook.time, 5, '1min 应按 5min 档取值');
+    assert.equal(E.epvOutOfRange(1.1, ['1.20', '1.45']), 'low', 'EPV 1.10 低于最低档应标记 low');
+    assert.equal(E.epvOutOfRange(1.5, ['1.20', '1.45']), 'high');
+    assert.equal(E.epvOutOfRange(1.35, ['1.20', '1.45']), null);
+    const lowEpvCalc = E.calculate({ ...baseInput, epv: 1.1 });
+    assert.equal(lowEpvCalc.epvWarning, 'low', 'calculate 应透出 low 告警');
+    assert.equal(lowEpvCalc.matchedEpvKey, '1.20', 'EPV 1.10 应按最低档 1.20 取值');
+    ok('short / low / high 三类越界均可识别');
+}
+
+// ────────────────────────────────────────────────────────────────
+// 11. 恒流表与官方规格书对齐（8XNFG90 补 6min 档、修正 20h 档尾数）
+// ────────────────────────────────────────────────────────────────
+console.log('\n11. 恒流表数据对齐官方规格书:');
+{
+    const g90cc = E.BATTERY_MODEL_MAP['8XNFG90'].constantCurrentTable;
+    assert.ok(near(g90cc['1.45'][6], 571.6, 1e-9), '1.45V/6min 应为 571.6A');
+    assert.ok(near(g90cc['1.20'][6], 761.4, 1e-9), '1.20V/6min 应为 761.4A');
+    assert.ok(near(g90cc['1.45'][1200], 4.5, 1e-9), '1.45V/1200min 应为 4.5A（旧值 4.4 为笔误）');
+    assert.ok(near(g90cc['1.25'][1200], 4.6, 1e-9), '1.25V/1200min 应为 4.6A（旧值 4.5 为笔误）');
+    // 6min 档现在可以直接折算平均电压，不再回落到标称 1.65V
+    const avgV6 = E.avgCellVoltage(E.BATTERY_MODEL_MAP['8XNFG90'], '1.30', 6);
+    assert.ok(avgV6 && near(avgV6, 924.3 / 705.6, 1e-3), `6min 档平均电压应为 924.3/705.6≈1.310，实际 ${avgV6}`);
+    ok('8XNFG90 恒流表 6min 档补齐，Ah 折算不再回落标称电压', `${avgV6.toFixed(3)} V/cell @6min`);
+}
+
+// ────────────────────────────────────────────────────────────────
+// 12. 最大放电电流硬性校核（10C 极限）
+// ────────────────────────────────────────────────────────────────
+console.log('\n12. 单组最大电流 vs 规格极限:');
+{
+    // 144 节 × 1.3V：900A 极限 → 单组功率上限 ≈ 168.5 kW；给 300kW 必然超限
+    const overload = E.calculate({ ...baseInput, numberOfStrings: 1,
+        requiredPowerMode: 'manual', manualRequiredPower: 300000 });
+    assert.equal(overload.currentOverload, true, '300kW/单组应识别超限');
+    assert.equal(overload.maxAllowedCurrentA, 900, '8XNFG90 极限应为 900A');
+    const within = E.calculate({ ...baseInput, numberOfStrings: 3 });
+    assert.equal(within.currentOverload, false, '常规配置不应超限');
+    ok('超限可识别并给出型号极限', `300kW/1组 → ${overload.maxCurrentPerString.toFixed(0)}A > ${overload.maxAllowedCurrentA}A`);
 }
 
 console.log('─'.repeat(72));
