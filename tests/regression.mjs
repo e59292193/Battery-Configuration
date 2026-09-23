@@ -125,6 +125,12 @@ const cp = E.calculateCapacity({ ...baseInput, numberOfStrings: 3 });
 const ratio = pw.satisfactionRatio / cp.energySatisfactionRatio;
 assert.ok(ratio > 0.9 && ratio < 1.1,
     `同一输入两种模式满足率差异应 <10%，实际 ${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.energySatisfactionRatio * 100).toFixed(1)}%`);
+assert.ok(near(pw.energySatisfactionRatio, pw.satisfactionRatio, 1e-12),
+    '功率模式恒定负荷的能量满足率应与同档功率满足率一致');
+assert.ok(near(pw.requiredEnergyWh, pw.totalRequiredPower * baseInput.backupTimeMin / 60, 0.01),
+    '功率模式应输出需求能量 Wh');
+assert.ok(near(pw.providedEnergyWh, pw.totalProposedPower * baseInput.backupTimeMin / 60, 0.01),
+    '功率模式应按恒功率表输出查表可用能量 Wh');
 ok('恒定负荷下两种模式结论一致', `${(pw.satisfactionRatio * 100).toFixed(1)}% vs ${(cp.energySatisfactionRatio * 100).toFixed(1)}%`);
 
 // ────────────────────────────────────────────────────────────────
