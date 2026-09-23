@@ -60,15 +60,30 @@ export function corsMiddleware(req, res, next) {
         if (env.allowedOrigins.includes(origin)) {
             res.setHeader('Access-Control-Allow-Origin', origin);
             res.setHeader('Vary', 'Origin');
-            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Api-Key');
+            res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Api-Key, X-App-Token');
             res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
         }
     } else if (origin) {
         res.setHeader('Access-Control-Allow-Origin', '*');
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Api-Key');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, X-User-Api-Key, X-App-Token');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     }
     if (req.method === 'OPTIONS') { res.sendStatus(204); return; }
+    next();
+}
+
+/**
+ * 可选访问口令：仅当 .env 配置 API_AUTH_TOKEN 时启用。
+ * 启用后 /api 下除 /health 外的接口都必须带匹配的 X-App-Token 头，
+ * 防止公网部署时陌生人消耗服务端密钥额度。未配置时完全放行（本机自用场景）。
+ */
+export function authMiddleware(req, res, next) {
+    if (!env.apiAuthToken) return next();
+    if (req.path === '/health' || req.path === '/') return next();
+    const token = req.get('X-App-Token') || '';
+    if (token !== env.apiAuthToken) {
+        return next(httpError(401, 'APP_AUTH_REQUIRED', '需要访问口令：请在 AI 设置面板「访问口令」栏填写与服务端 API_AUTH_TOKEN 相同的值。'));
+    }
     next();
 }
 

@@ -1,12 +1,14 @@
 import { Router } from 'express';
+import { createHash } from 'node:crypto';
 import { env } from '../lib/env.js';
 import { httpError, mapUpstreamError, logRequest } from '../lib/errors.js';
 
 const router = Router();
 
-// 5 分钟内存缓存
-let cache = { ts: 0, data: null };
+// 5 分钟内存缓存（按密钥指纹隔离，避免 A 用户的模型列表被回给 B 用户）
+let cache = { ts: 0, data: null, keyId: '' };
 const CACHE_TTL = 5 * 60 * 1000;
+const keyIdOf = (key) => createHash('sha256').update(key).digest('hex').slice(0, 16);
 
 /** GET /api/models — 代转 DeepSeek 模型列表（带缓存） */
 router.get('/models', async (req, res, next) => {
@@ -14,9 +16,10 @@ router.get('/models', async (req, res, next) => {
     if (!key) {
         return next(httpError(400, 'NO_KEY', '未配置 API Key：请在 AI 设置面板填写个人密钥，或在服务端 .env 配置 DEEPSEEK_API_KEY。'));
     }
+    const keyId = keyIdOf(key);
     const start = Date.now();
     try {
-        if (cache.data && Date.now() - cache.ts < CACHE_TTL) {
+        if (cache.data && cache.keyId === keyId && Date.now() - cache.ts < CACHE_TTL) {
             req._durMs = Date.now() - start;
             logRequest(req, { status: 200, cached: true });
             return res.json(cache.data);
@@ -30,7 +33,7 @@ router.get('/models', async (req, res, next) => {
             throw mapUpstreamError(r.status, txt);
         }
         const j = await r.json();
-        cache = { ts: Date.now(), data: j };
+        cache = { ts: Date.now(), data: j, keyId };
         req._durMs = Date.now() - start;
         logRequest(req, { status: 200 });
         res.json(j);

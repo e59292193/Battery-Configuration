@@ -44,6 +44,7 @@ const {
     BATTERY_MODEL_MAP,
     getRecommendedDcBlocks,
     calculateDc,
+    setDcLoadMode,
     getDcState,
     getRecommendedAcConfig,
     loadAcDutyPreset,
@@ -199,6 +200,38 @@ assert.equal(state2.acDutyCycleList.length, 3, '项目2应有三个阶段');
 const totalTimeP2 = state2.acDutyCycleList.reduce((acc, c) => acc + c.durationMin, 0);
 assert.equal(totalTimeP2, 240, '项目2总时长应为 240 min (4h)');
 console.log(`  ✓ 载入项目2阶梯工况: 42.7kVA/60m + 7.4kVA/60m + 0.36kVA/120m · 总时长 ${totalTimeP2} min (4.0h)`);
+
+// 5. 推荐器无解时必须显式报出（旧版静默返回 10 块/80 节的错误答案）
+console.log('\n5. 直流推荐器无解识别:');
+const recBad = getRecommendedDcBlocks(110.4, 112.0);   // 充电上限 112V 压死 → 无可行块数
+assert.equal(recBad.ok, false, '110.4~112V 窗口无可行块数，必须 ok:false');
+assert.ok(recBad.note && recBad.note.length > 10, '无解时必须给出原因说明');
+assert.equal(getRecommendedDcBlocks(110.4, 144.0).ok, true, '正常窗口应 ok:true');
+console.log(`  ✓ 无解窗口正确识别：${recBad.note.slice(0, 38)}…`);
+
+// 6. 恒定负荷 ↔ 阶梯工况 双向切换（旧版按钮 ID 不匹配导致切不回去）
+console.log('\n6. 直流负载模式双向切换:');
+setDcLoadMode('constant');
+assert.equal(getDcState().dcLoadMode, 'constant', '应切换到恒定负荷');
+setDcLoadMode('duty');
+assert.equal(getDcState().dcLoadMode, 'duty', '应能切回阶梯工况');
+setDcLoadMode('constant'); // 保持 constant 供下一项测试
+console.log('  ✓ duty → constant → duty 双向切换正常');
+
+// 7. 恒定负荷：kW 必须按放电下限 Vmin 折算电流（放电末期最严），且参数经 inputs 传入
+console.log('\n7. 直流恒定负荷（kW → A 按 Vmin 折算）:');
+const resConst = calculateDc({
+    batteryModelId: '8XNFG90', cellsPerString: 80, blocksPerGroup: 10, numberOfStrings: 3,
+    dcVoltMin: 110.4, dcVoltMax: 144.0, dcSystemVoltage: 110, temperature: 25,
+    agingFactor: 1, designMargin: 1,
+    dcConstLoadValue: 10, dcConstLoadUnit: 'kW', dcConstTimeMin: 60
+});
+assert.ok(Math.abs(resConst.continuousCurrentA - 10000 / 110.4) < 1e-6,
+    `10kW 应按 Vmin=110.4 折算为 ${(10000 / 110.4).toFixed(2)}A，实际 ${resConst.continuousCurrentA.toFixed(2)}A`);
+assert.ok(Math.abs(resConst.rawRequiredAh - 10000 / 110.4) < 1e-6, '60min 的 Ah 需求应等于电流值');
+assert.equal(resConst.totalDurationMin, 60, '持续时长应来自 dcConstTimeMin');
+console.log(`  ✓ 10kW × 60min → ${resConst.continuousCurrentA.toFixed(2)}A（按放电下限 110.4V 折算，与电压窗口口径一致）`);
+setDcLoadMode('duty');   // 复原默认状态
 
 console.log('\n────────────────────────────────────────────────────────────────────────');
 console.log('全部测试用例验证通过！100% 符合要求。');

@@ -18,6 +18,10 @@ try {
 export const env = {
     port: Number(process.env.PORT || 3000),
     deepseekKey: process.env.DEEPSEEK_API_KEY || '',
+    // 可选访问口令：公网/团队部署时防止陌生人消耗服务端密钥额度（前端设置面板填同一口令）
+    apiAuthToken: process.env.API_AUTH_TOKEN || '',
+    // 可选模型白名单（逗号分隔）；留空则只做格式校验
+    modelAllowlist: (process.env.MODEL_ALLOWLIST || '').split(',').map(s => s.trim()).filter(Boolean),
     allowedOrigins: (process.env.ALLOWED_ORIGINS || '*').split(',').map(s => s.trim()).filter(Boolean),
     rateLimit: Math.max(1, Number(process.env.RATE_LIMIT || 30)),
     upstream: 'https://api.deepseek.com',
@@ -26,4 +30,6 @@ export const env = {
     maxFileBytes: 20 * 1024 * 1024,
     maxFiles: 10,
     maxTotalBytes: 60 * 1024 * 1024,
+    // chat 消息体序列化后的体积上限（约 3MB，防止超大上下文攻击额度）
+    maxMessagesChars: 3 * 1024 * 1024,
 };
