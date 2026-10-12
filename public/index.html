@@ -46,6 +46,13 @@
     <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
     <!-- pdf.js：PDF 文本提取 / 扫描件转图片（回退通道） -->
     <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.11.174/build/pdf.min.js"></script>
+    <!-- 导出引擎（本地优先 + CDN 回退）：ExcelJS（高保真样式/配色/加粗导出）与 html2canvas + jsPDF（高清矢量/A4 PDF 导出） -->
+    <script src="vendor/exceljs.min.js"></script>
+    <script>if (typeof ExcelJS === 'undefined') { document.write('<script src="https://cdn.jsdelivr.net/npm/exceljs@4.4.0/dist/exceljs.min.js"><\/script>'); }</script>
+    <script src="vendor/html2canvas.min.js"></script>
+    <script>if (typeof html2canvas === 'undefined') { document.write('<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>'); }</script>
+    <script src="vendor/jspdf.umd.min.js"></script>
+    <script>if (typeof window.jspdf === 'undefined') { document.write('<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/script>'); }</script>
     <style>
         /* ═══════════════════════════════════════════════════════════════
            THEME SYSTEM — CSS 变量驱动（6 套主题）
@@ -482,10 +489,15 @@
         /* 设置面板 */
         .modal-mask { position:fixed; inset:0; z-index:70; background: rgb(0 0 0 / 0.5); display:flex; align-items:center; justify-content:center; padding:1rem; }
         .modal-box { width:100%; max-width:460px; max-height:88vh; overflow-y:auto; background: rgb(var(--c-panel)); border:1px solid rgb(var(--c-border)); border-radius:1rem; box-shadow: 0 24px 60px rgb(0 0 0 / 0.4); }
+        /* 导出表格高级模态框与预览 */
+        .export-modal-box { width:95vw; max-width:1160px; height:90vh; max-height:890px; background: rgb(var(--c-panel)); border:1px solid rgb(var(--c-border)); border-radius:1rem; box-shadow: 0 24px 60px rgb(0 0 0 / 0.45); display:flex; flex-direction:column; overflow:hidden; }
+        .export-checklist-item { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 10px; border-radius:8px; transition:background .15s ease; cursor:pointer; user-select:none; }
+        .export-checklist-item:hover { background: rgb(var(--c-elevated)); }
+        .export-preview-sheet { background:#ffffff; color:#1e293b; box-shadow: 0 4px 24px rgba(0,0,0,0.15); border-radius:10px; overflow:hidden; font-family:'Inter', 'Microsoft YaHei', sans-serif; }
 
         /* 主题宫格选择器 */
         .theme-menu { position:absolute; right:0; top:calc(100% + 8px); z-index:65; width:248px; padding:.6rem; border-radius:.75rem; background: rgb(var(--c-panel)); border:1px solid rgb(var(--c-border)); box-shadow: 0 16px 44px rgb(0 0 0 / 0.35); display:none; }
-        .theme-menu.open { display:block; }
+        .theme-menu.open { display:block !important; }
         .theme-item { display:flex; align-items:center; gap:.6rem; width:100%; padding:.45rem .5rem; border-radius:.55rem; cursor:pointer; transition:background .15s ease; color: rgb(var(--c-text-2)); font-size:12.5px; font-weight:600; }
         .theme-item:hover { background: rgb(var(--c-elevated)); color: rgb(var(--c-text)); }
         .theme-item .sw { width:34px; height:22px; border-radius:6px; border:1px solid rgb(0 0 0 / 0.15); flex:0 0 auto; }
@@ -522,6 +534,27 @@
                             <i data-lucide="sparkles" class="h-4 w-4"></i>
                             <span>AI 辅助分析</span>
                         </button>
+                        <!-- ── 语言切换 Language Switcher ── -->
+                        <div class="relative" id="langPickerWrap">
+                            <button type="button" id="langPickerBtn" title="切换语言 / Language" aria-label="切换语言"
+                                class="btn btn-ghost px-3 py-2 text-xs flex items-center gap-1.5 cursor-pointer">
+                                <i data-lucide="languages" class="h-3.5 w-3.5 text-accent pointer-events-none"></i>
+                                <span id="langPickerLabel" class="pointer-events-none">中文</span>
+                                <i data-lucide="chevron-down" class="h-3.5 w-3.5 pointer-events-none"></i>
+                            </button>
+                            <div id="langMenu" class="theme-menu !w-36" role="menu" aria-label="语言选择">
+                                <button type="button" class="theme-item" data-lang-id="zh" role="menuitem">
+                                    <span class="text-base leading-none">🇨🇳</span>
+                                    <span>简体中文</span>
+                                    <span class="tick" id="langTickZh">✓</span>
+                                </button>
+                                <button type="button" class="theme-item" data-lang-id="en" role="menuitem">
+                                    <span class="text-base leading-none">🇺🇸</span>
+                                    <span>English</span>
+                                    <span class="tick" id="langTickEn">✓</span>
+                                </button>
+                            </div>
+                        </div>
                         <div class="relative" id="themePickerWrap">
                             <button type="button" id="themePickerBtn" title="选择主题" aria-label="选择主题"
                                 class="btn btn-ghost px-3 py-2 text-xs">
@@ -843,12 +876,12 @@
                             <div class="advanced-content border-t border-line/40 px-5 pb-5 pt-4" id="advancedContent">
                                 <div class="grid-2 grid grid-cols-2 gap-3">
                                     <div class="space-y-1">
-                                        <label class="lbl" for="designMargin">设计余量</label>
-                                        <input type="number" id="designMargin" value="1" step="0.01" min="0.8" max="2" class="inp">
+                                        <label class="lbl" for="designMargin">设计余量 <span class="text-ink3 font-normal">(≥1乘, &lt;1除)</span></label>
+                                        <input type="number" id="designMargin" value="1" step="0.01" min="0.1" max="3" class="inp" title="设计裕量系数：输入≥1时使用乘法计算，输入<1时使用除法计算（例如输入 1.10 或 0.90 均能放大负荷需求）">
                                     </div>
                                     <div class="space-y-1">
-                                        <label class="lbl" for="agingFactor">老化系数 <span class="text-ink3 font-normal">(EOL 80% → 1.20)</span></label>
-                                        <input type="number" id="agingFactor" value="1.2" step="0.01" min="1" max="2" class="inp" title="寿命末期容量衰减到 80% 时仍需满足负荷，需求功率/能量要乘以该系数（IEEE 485 常用 1.25）">
+                                        <label class="lbl" for="agingFactor">老化系数 <span class="text-ink3 font-normal">(EOL 80% → 0.8 或 1.25)</span></label>
+                                        <input type="number" id="agingFactor" value="1.2" step="0.01" min="0.1" max="3" class="inp" title="寿命末期老化系数：输入≥1时使用乘法计算，输入<1时使用除法计算（例如输入 1.25 或 0.80 均能放大负荷需求）">
                                     </div>
                                     <div class="space-y-1">
                                         <label class="lbl" for="temperature">环境温度 (℃)</label>
@@ -1537,6 +1570,150 @@
     </div>
 </div>
 
+<!-- ══════════════ 导出表格与配置方案预览模态框 ══════════════ -->
+<div id="exportModal" class="modal-mask" style="display:none">
+    <div class="export-modal-box" role="dialog" aria-modal="true" aria-label="导出配置表格">
+        <!-- 弹窗顶栏 -->
+        <div class="flex items-center justify-between border-b border-line/60 px-5 py-3.5 bg-panel">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-ok/15 text-ok">
+                    <i data-lucide="file-spreadsheet" class="h-4 w-4"></i>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-ink flex items-center gap-2">
+                        导出配置表格与方案预览
+                        <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">专业报表</span>
+                    </h3>
+                    <p class="text-[11px] text-ink3" id="exportModalSubtitleText">勾选导出参数 · 实时无需下载预览 · 样式一致的高保真 Excel / PDF 导出</p>
+                </div>
+            </div>
+            <button type="button" id="exportModalCloseBtn" class="btn btn-ghost h-8 w-8 !p-0" aria-label="关闭导出面板">
+                <i data-lucide="x" class="h-4 w-4"></i>
+            </button>
+        </div>
+
+        <!-- 弹窗主体（左右分栏） -->
+        <div class="grid grid-cols-1 md:grid-cols-12 flex-1 min-h-0 overflow-hidden">
+            <!-- 左栏：参数勾选与导出格式设置 -->
+            <div class="md:col-span-5 lg:col-span-5 border-r border-line/60 flex flex-col bg-elev/30 min-h-0">
+                <!-- 顶部快捷操作栏 -->
+                <div class="p-3.5 border-b border-line/60 space-y-2.5 bg-panel/50">
+                    <div class="flex items-center justify-between">
+                        <div class="flex items-center gap-1.5">
+                            <span class="text-xs font-bold text-ink" id="exportParamCheckTitle">参数勾选</span>
+                            <span id="exportSelectedCountBadge" class="rounded-full bg-ok/15 px-2 py-0.5 font-mono text-[10px] font-semibold text-ok">全选 24/24</span>
+                        </div>
+                        <div class="flex items-center gap-1">
+                            <button type="button" id="exportSelectAllBtn" class="btn btn-ghost px-2 py-1 text-[11px]">全选</button>
+                            <button type="button" id="exportBriefBtn" class="btn btn-ghost px-2 py-1 text-[11px] text-accent font-bold" title="预设简要版：仅勾选22项常用核心参数">简要版</button>
+                            <button type="button" id="exportInvertBtn" class="btn btn-ghost px-2 py-1 text-[11px]">反选</button>
+                            <button type="button" id="exportClearBtn" class="btn btn-ghost px-2 py-1 text-[11px]">清空</button>
+                            <button type="button" id="exportKeyOnlyBtn" class="btn btn-ghost px-2 py-1 text-[11px] text-amber-500 font-medium">仅重点</button>
+                        </div>
+                    </div>
+                    <!-- 搜索参数过滤框 -->
+                    <div class="relative">
+                        <i data-lucide="search" class="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-ink3"></i>
+                        <input type="text" id="exportParamFilterInput" placeholder="快速筛选参数名称（如：功率、电压、电流）..." class="inp pl-8 text-xs py-1.5">
+                    </div>
+                </div>
+
+                <!-- 参数勾选列表容器（支持分类滚动） -->
+                <div id="exportParamsListContainer" class="flex-1 overflow-y-auto p-3 space-y-3">
+                    <!-- 动态生成 -->
+                </div>
+
+                <!-- 底部导出格式与下载触发区 -->
+                <div class="p-3.5 border-t border-line/60 bg-panel/90 space-y-3">
+                    <!-- 导出表格语言选择 -->
+                    <div>
+                        <label class="lbl mb-1.5 flex items-center justify-between text-xs">
+                            <span id="exportLangLabelText">导出表格语言</span>
+                            <span class="text-[10px] text-ink3 font-normal" id="exportLangSubText">支持中文与英文报表输出</span>
+                        </label>
+                        <div class="grid grid-cols-2 gap-2">
+                            <label class="export-format-tile relative flex cursor-pointer items-center justify-center rounded-xl border border-line/80 bg-elev/50 p-2 text-center transition hover:border-accent">
+                                <input type="radio" name="exportLangRadio" value="zh" checked class="peer sr-only">
+                                <div class="peer-checked:border-accent peer-checked:bg-accent/15 absolute inset-0 rounded-xl border-2 border-transparent transition"></div>
+                                <span class="text-xs font-bold text-ink z-10" id="exportLangZhText">🇨🇳 中文报表</span>
+                            </label>
+
+                            <label class="export-format-tile relative flex cursor-pointer items-center justify-center rounded-xl border border-line/80 bg-elev/50 p-2 text-center transition hover:border-accent">
+                                <input type="radio" name="exportLangRadio" value="en" class="peer sr-only">
+                                <div class="peer-checked:border-accent peer-checked:bg-accent/15 absolute inset-0 rounded-xl border-2 border-transparent transition"></div>
+                                <span class="text-xs font-bold text-ink z-10" id="exportLangEnText">🇺🇸 English Report</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label class="lbl mb-1.5 flex items-center justify-between text-xs">
+                            <span id="exportFormatLabel">导出文件格式</span>
+                            <span class="text-[10px] text-ink3 font-normal" id="exportFormatHint">Excel 与 PDF 样式与排版严格一致</span>
+                        </label>
+                        <div class="grid grid-cols-3 gap-2">
+                            <label class="export-format-tile relative flex cursor-pointer flex-col items-center justify-center rounded-xl border border-line/80 bg-elev/50 p-2 text-center transition hover:border-accent">
+                                <input type="radio" name="exportFormatRadio" value="xlsx" checked class="peer sr-only">
+                                <div class="peer-checked:border-accent peer-checked:bg-accent/15 absolute inset-0 rounded-xl border-2 border-transparent transition"></div>
+                                <i data-lucide="sheet" class="h-4.5 w-4.5 text-emerald-500 mb-0.5 z-10"></i>
+                                <span class="text-xs font-bold text-ink z-10">Excel</span>
+                                <span class="text-[10px] text-ink3 z-10 font-mono">.xlsx</span>
+                            </label>
+
+                            <label class="export-format-tile relative flex cursor-pointer flex-col items-center justify-center rounded-xl border border-line/80 bg-elev/50 p-2 text-center transition hover:border-accent">
+                                <input type="radio" name="exportFormatRadio" value="pdf" class="peer sr-only">
+                                <div class="peer-checked:border-accent peer-checked:bg-accent/15 absolute inset-0 rounded-xl border-2 border-transparent transition"></div>
+                                <i data-lucide="file-text" class="h-4.5 w-4.5 text-rose-500 mb-0.5 z-10"></i>
+                                <span class="text-xs font-bold text-ink z-10">PDF 文档</span>
+                                <span class="text-[10px] text-ink3 z-10 font-mono">.pdf</span>
+                            </label>
+
+                            <label class="export-format-tile relative flex cursor-pointer flex-col items-center justify-center rounded-xl border border-line/80 bg-elev/50 p-2 text-center transition hover:border-accent">
+                                <input type="radio" name="exportFormatRadio" value="html" class="peer sr-only">
+                                <div class="peer-checked:border-accent peer-checked:bg-accent/15 absolute inset-0 rounded-xl border-2 border-transparent transition"></div>
+                                <i data-lucide="code" class="h-4.5 w-4.5 text-blue-500 mb-0.5 z-10"></i>
+                                <span class="text-xs font-bold text-ink z-10">HTML 网页</span>
+                                <span class="text-[10px] text-ink3 z-10 font-mono">.html</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="flex gap-2">
+                        <button type="button" id="exportDownloadBtn" class="btn btn-ok flex-1 py-2 text-xs font-bold flex items-center justify-center gap-1.5 shadow-md">
+                            <i data-lucide="download" class="h-4 w-4"></i>
+                            <span id="exportDownloadBtnText">下载 Excel 表格 (.xlsx)</span>
+                        </button>
+                        <button type="button" id="exportPrintBtn" class="btn btn-ghost px-3 py-2 text-xs flex items-center gap-1" title="浏览器直接打印或另存为 PDF">
+                            <i data-lucide="printer" class="h-3.5 w-3.5"></i>
+                            <span>打印</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右栏：实时表格预览区（免下载即可看） -->
+            <div class="md:col-span-7 lg:col-span-7 flex flex-col bg-base2/60 min-h-0 overflow-hidden">
+                <div class="px-4 py-2.5 border-b border-line/60 flex items-center justify-between bg-panel/40">
+                    <div class="flex items-center gap-2">
+                        <span class="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span class="text-xs font-bold text-ink" id="exportPreviewHeaderTitle">实时导出预览 (无需下载直接查看)</span>
+                    </div>
+                    <div class="flex items-center gap-2 text-xs text-ink3">
+                        <span id="exportPreviewRowCount" class="text-[11px] font-mono">24 项数据</span>
+                    </div>
+                </div>
+
+                <!-- 预览卡片滚动视窗 -->
+                <div class="flex-1 overflow-y-auto p-4 md:p-6 flex justify-center bg-base2/80">
+                    <div id="exportPreviewPaper" class="export-preview-sheet w-full max-w-xl transition-all shadow-xl border border-line/50 self-start">
+                        <!-- 动态生成的导出表格页面内容 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
 <input type="hidden" id="backupTimeInput" value="15">
 
 <script>
@@ -1749,17 +1926,38 @@ function avgCellVoltage(model, epvKey, minutes) {
     return w.value / cc[w.time];
 }
 /**
+ * 高级参数（设计余量与老化系数）工程计算口径：
+ * 若输入值 >= 1，则参与计算时使用乘法（例如 1.25 表示需求放大 1.25 倍）；
+ * 若输入值 < 1 且 > 0，则参与计算时使用除法（例如 0.8 表示寿命末期容量只剩 80%，需求除以 0.8 即放大 1.25 倍）；
+ * 若输入无效或 <= 0，则默认不缩放（等价于 1）。
+ */
+function getFactorMultiplier(val) {
+    const v = parseFloat(val);
+    if (!Number.isFinite(v) || v <= 0) return 1;
+    return v >= 1 ? v : (1 / v);
+}
+
+/**
+ * 格式化算式中的系数项（例如 "× 老化 1.25" 或 "÷ 老化 0.80"）
+ */
+function formatFactorText(name, val) {
+    const v = parseFloat(val);
+    if (!Number.isFinite(v) || v <= 0) return `× ${name} 1`;
+    return v >= 1 ? `× ${name} ${v}` : `÷ ${name} ${v}`;
+}
+
+/**
  * 交流阶梯工况汇总（纯函数）。工况表输入单位为「视在功率 kVA」，逐级换算到电池侧：
  *   交流有功 W = kVA × 1000 × PF
- *   电池侧 W  = 交流有功 ÷ 逆变效率 × 老化系数 × 设计余量
+ *   电池侧 W  = 交流有功 ÷ 逆变效率 × 老化系数 (≥1乘,<1除) × 设计余量 (≥1乘,<1除)
  * 因此「累计电量」就是「电池侧所需能量」，两者口径一致、数值必然相等。
  */
 function computeDutySummary(steps, opt) {
     const pf = opt.powerFactor > 0 ? opt.powerFactor : 1;
     const eff = opt.inverterEfficiency > 0 ? opt.inverterEfficiency : 1;
-    const af = opt.agingFactor > 0 ? opt.agingFactor : 1;
-    const dm = opt.designMargin > 0 ? opt.designMargin : 1;
-    const kvaToBatteryW = 1000 * pf / eff * af * dm;
+    const afMult = getFactorMultiplier(opt.agingFactor);
+    const dmMult = getFactorMultiplier(opt.designMargin);
+    const kvaToBatteryW = 1000 * pf / eff * afMult * dmMult;
     let totalMin = 0, apparentKvah = 0, acLoadWh = 0, batteryWh = 0, peakKva = 0, peakBatteryW = 0;
     const batterySteps = (steps || []).map((s, idx) => {
         const durationMin = Math.max(0, parseFloat(s.durationMin) || 0);
@@ -1807,12 +2005,13 @@ function calculate(inputs) {
     const vv = {
         upsVoltageLower, upsVoltageUpper, batteryDischargeLower, batteryChargeUpper,
         dischargeInRange: batteryDischargeLower >= upsVoltageLower,
-        chargeInRange: batteryChargeUpper <= upsVoltageUpper
+        chargeInRange: batteryChargeUpper <= upsVoltageUpper,
+        matched: (batteryDischargeLower >= upsVoltageLower) && (batteryChargeUpper <= upsVoltageUpper)
     };
-    // 老化系数 = 寿命末期只剩 80% 容量 → 需求必须「放大」，所以是乘法（旧版写成除法，方向反了）
-    const agingFactor = inputs.agingFactor > 0 ? inputs.agingFactor : 1;
-    const designMargin = inputs.designMargin > 0 ? inputs.designMargin : 1;
-    const autoRequiredPower = (inputs.upsRatingKva * 1000 * inputs.powerFactor) / inputs.inverterEfficiency * agingFactor * designMargin;
+    // 老化系数与设计余量：>= 1 乘法计算，< 1 除法计算（例如老化 0.8 或 1.25 均能正确放大负荷需求）
+    const afMult = getFactorMultiplier(inputs.agingFactor);
+    const dmMult = getFactorMultiplier(inputs.designMargin);
+    const autoRequiredPower = (inputs.upsRatingKva * 1000 * inputs.powerFactor) / inputs.inverterEfficiency * afMult * dmMult;
 
     const dutySteps = Array.isArray(inputs.dutySteps)
         ? inputs.dutySteps.filter(s => (parseFloat(s.durationMin) || 0) > 0)
@@ -2123,10 +2322,15 @@ function formatTimeLabel(min) {
     if (min >= 60 && min % 60 === 0) return (min / 60) + 'h';
     return min + 'min';
 }
-// 用于按钮点击后显示给用户的备电时间标签（中文友好）
-function formatBackupTimeLabel(min) {
-    if (min >= 60 && min % 60 === 0) return (min / 60) + ' 小时';
-    return min + ' 分钟';
+// 用于按钮点击后显示给用户的备电时间标签（中英文双语自适应）
+function formatBackupTimeLabel(min, lang) {
+    const targetLang = lang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (targetLang === 'en');
+    if (min >= 60 && min % 60 === 0) {
+        const h = min / 60;
+        return isEn ? (h + (h > 1 ? ' Hours' : ' Hour')) : (h + ' 小时');
+    }
+    return isEn ? (min + ' Mins') : (min + ' 分钟');
 }
 
 function renderDischargeTable(modelId, epv, bTimeMin) {
@@ -2134,7 +2338,8 @@ function renderDischargeTable(modelId, epv, bTimeMin) {
     if (!model) return '';
     const isDc = (calcMode === 'dc');
     const tableSource = (isDc && model.constantCurrentTable) ? model.constantCurrentTable : model.dischargeTable;
-    const unitLabel = isDc ? '恒电流放电表 (A/Cell)' : '恒功率放电表 (W/Cell)';
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+    const unitLabel = isDc ? (isEn ? 'Constant Current Table (A/Cell)' : '恒电流放电表 (A/Cell)') : (isEn ? 'Constant Power Table (W/Cell)' : '恒功率放电表 (W/Cell)');
     const epvKeys = Object.keys(tableSource).sort((a, b) => parseFloat(b) - parseFloat(a));
     const timePoints = Object.keys(tableSource[epvKeys[0]]).map(Number).sort((a, b) => a - b);
     const matchedEpv = matchEpvKey(epv, Object.keys(tableSource));
@@ -2146,7 +2351,7 @@ function renderDischargeTable(modelId, epv, bTimeMin) {
     html += `<i data-lucide="table-2" class="h-3.5 w-3.5" style="${isDc ? 'color:rgb(var(--c-dc))' : ''}"></i>`;
     html += `${modelId} ${unitLabel}</h4>`;
     html += `<div class="discharge-table-container"><table class="w-full text-xs"><thead><tr>`;
-    html += `<th class="dt-th-head sticky left-0 z-10 px-2 py-1.5 text-left font-bold">电压</th>`;
+    html += `<th class="dt-th-head sticky left-0 z-10 px-2 py-1.5 text-left font-bold">${isEn ? "Voltage" : "电压"}</th>`;
     timePoints.forEach(t => {
         const isInterp = interpTimes.has(t);
         let style = '';
@@ -2174,7 +2379,7 @@ function renderDischargeTable(modelId, epv, bTimeMin) {
         html += `</tr>`;
     });
     html += `</tbody></table></div>`;
-    html += `<p class="mt-2 text-[10px] text-ink3">高亮 = 当前查表位置 (EPV ${matchedEpv}V × ${matchedTime}min)</p>`;
+    html += `<p class="mt-2 text-[10px] text-ink3">${isEn ? "Highlighted = Current lookup position" : "高亮 = 当前查表位置"} (EPV ${matchedEpv}V × ${matchedTime}min)</p>`;
 
     html += `</div>`;
     return html;
@@ -2184,10 +2389,37 @@ function renderDischargeTable(modelId, epv, bTimeMin) {
 // CURRENT CONFIG COPY SUMMARY  (电池信息，排除尺寸/体积/重量/高级参数/TCV/UPS)
 // ══════════════════════════════════════════════════════════════════
 let lastCopySummary = '';
-function buildConfigSummary(inputs, r, dc) {
+function buildConfigSummary(inputs, r, dc, targetLang) {
+    const lang = targetLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
     const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
     const modelLabel = model ? (inputs.batteryModelId + ' (' + model.specs.label + ')') : inputs.batteryModelId;
+
     if (calcMode === 'dc' && dc) {
+        if (isEn) {
+            const lines = [
+                '【DC UPS Battery Configuration Solution】',
+                'Battery Model: ' + modelLabel,
+                'DC System Nominal Voltage: ' + fmt(inputs.dcSystemVoltage, 1) + ' V',
+                'DC Bus Voltage Range: ' + fmt(inputs.dcVoltMin, 1) + ' V ~ ' + fmt(inputs.dcVoltMax, 1) + ' V',
+                'Blocks per String: ' + dc.blocks + ' Blocks (' + dc.cells + ' Cells)',
+                'Configured Strings: ' + dc.strings + ' Strings Parallel (Total ' + dc.totalQuantity + ' Blocks)',
+                'Cutoff Verification: CC Table ' + dc.cellDis.toFixed(2) + ' V/cell → End Bus '
+                    + fmt(dc.batteryDischargeLower, 1) + ' V (UPS Min ' + fmt(dc.vMin, 1) + ' V) | Charge Upper ' + dc.cellChg.toFixed(3) + ' V/cell',
+                'Load Profile Type: ' + (dcLoadMode === 'duty' ? 'IEEE 485 Duty Cycle Load' : 'Continuous Constant Current/Power Load'),
+                'Total Backup Duration: ' + fmt(dc.totalDurationMin, 1) + ' min (' + (dc.totalDurationMin/60).toFixed(1) + ' h)',
+                'Cumulative Energy Demand: ' + fmt(dc.rawRequiredAh, 2) + ' Ah (Design: ' + fmt(dc.adjustedRequiredAh, 1) + ' Ah)',
+                'Continuous Current: ' + fmt(dc.adjustedContCurrentA, 1) + ' A | Peak Inrush Current: ' + fmt(dc.adjustedPeakCurrentA, 1) + ' A',
+                'CC Lookup Capability: ' + fmt(dc.cellDischargeA, 1) + ' A/cell @ EPV ' + dc.matchedEpvKey + 'V, ' + dc.matchedTime + 'min',
+                'Available Discharge Current: ' + fmt(dc.totalAvailDischargeA, 1) + ' A (Satisfaction ' + (dc.currentSatRatio*100).toFixed(1) + '%)',
+                'Peak Pulse C-Rate: ' + dc.peakCrate.toFixed(2) + ' C (Per string ' + fmt(dc.peakCurrentPerString, 1) + ' A, Limit 10C/' + dc.maxAllowedPulseA + ' A, Margin ' + dc.pulseMarginRatio.toFixed(1) + 'x)',
+                'Total System Energy: ' + fmt(dc.totalEnergyKWh, 2) + ' kWh (Total Capacity ' + dc.ratedTotalAh + ' Ah)',
+                'Total Net Weight: ' + fmt(dc.totalWeight, 1) + ' kg (Per block ' + (model ? model.specs.weightKg : 17.3) + ' kg)',
+                'Estimated Total Volume: ' + fmt(dc.totalVolume, 3) + ' m³',
+                'Ambient Temperature: ' + inputs.temperature + '℃ (Non-HVAC Wide Temp Range)'
+            ];
+            return lines.join('\n');
+        }
         const lines = [
             '【直流UPS电池配置方案 (DC UPS Configuration)】',
             '电池型号: ' + modelLabel,
@@ -2211,6 +2443,40 @@ function buildConfigSummary(inputs, r, dc) {
         ];
         return lines.join('\n');
     }
+
+    if (isEn) {
+        const lines = [
+            '【Battery Configuration Details】',
+            'Battery Model: ' + modelLabel,
+            'System Operating Voltage: ' + fmt(inputs.systemVoltage, 1) + ' V',
+            'Cell End Point Voltage (EPV): ' + inputs.epv + ' V',
+            'Block End Point Voltage (EPV×8): ' + (inputs.epv * 8).toFixed(2) + ' V',
+            'Total Cells per String: ' + inputs.cellsPerString + ' Cells',
+            'Battery Blocks per String: ' + r.blocksPerGroup + ' Blocks',
+            'Configured Parallel Strings: ' + inputs.numberOfStrings + ' Strings',
+            'Total Battery Quantity: ' + r.totalQuantity + ' Blocks',
+            'Configured Nominal Voltage: ' + fmt(r.configNominalVoltage, 1) + ' V',
+            'Configured Float Voltage (' + inputs.temperature + '℃): ' + fmt(r.configFloatVoltage, 1) + ' V',
+            'Discharge Lower Limit: ' + fmt(r.voltageValidation.batteryDischargeLower, 1) + ' V',
+            'Charge Upper Limit (' + inputs.temperature + '℃): ' + fmt(r.voltageValidation.batteryChargeUpper, 1) + ' V',
+            'Required Backup Duration: ' + formatBackupTimeLabel(backupTimeMin, 'en'),
+            'Total Battery Power Demand: ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW' + (inputs.requiredPowerMode === 'manual' ? ' (Manual)' : ' (Auto)'),
+            'Lookup Power per Cell: ' + fmt(r.wattPerCellLookup) + ' W/cell',
+            'Available Power per Block: ' + fmt(r.powerPerUnit) + ' W',
+            'Available Power per String: ' + fmt(r.totalPowerPerString / 1000, 2) + ' kW (' + fmt(r.totalPowerPerString, 1) + ' W)',
+            'Total Proposed Power: ' + fmt(r.totalProposedPower / 1000, 2) + ' kW (' + fmt(r.totalProposedPower, 0) + ' W)',
+            'Max Discharge Current: ' + fmt(r.maxCurrent) + ' A',
+            'Max Current per String: ' + fmt(r.maxCurrentPerString) + ' A',
+            'Power Satisfaction Ratio: ' + (r.satisfactionRatio * 100).toFixed(1) + ' %',
+            (typeof calcMode !== 'undefined' && calcMode === 'power' && !r.isDuty)
+                ? 'Energy Satisfaction Ratio (Available Wh ÷ Required Wh): ' + (r.energySatisfactionRatio * 100).toFixed(1)
+                + ' % (' + fmt(r.providedEnergyWh / 1000, 2) + ' / ' + fmt(r.requiredEnergyWh / 1000, 2) + ' kWh)' : '',
+            'Estimated Backup Runtime: ' + fmt(r.estimatedRunTime) + ' mins',
+            'Total System Energy: ' + fmt(r.totalEnergyKWh, 2) + ' kWh'
+        ].filter(Boolean);
+        return lines.join('\n');
+    }
+
     const lines = [
         '【电池配置详细信息 Battery Configuration】',
         '电池型号: ' + modelLabel,
@@ -2225,7 +2491,7 @@ function buildConfigSummary(inputs, r, dc) {
         '配置浮充电压 (' + inputs.temperature + '℃): ' + fmt(r.configFloatVoltage, 1) + ' V',
         '放电下限电压: ' + fmt(r.voltageValidation.batteryDischargeLower, 1) + ' V',
         '充电上限电压 (' + inputs.temperature + '℃): ' + fmt(r.voltageValidation.batteryChargeUpper, 1) + ' V',
-        '要求备电时间: ' + formatBackupTimeLabel(backupTimeMin),
+        '要求备电时间: ' + formatBackupTimeLabel(backupTimeMin, 'zh'),
         '电池总功率需求: ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW' + (inputs.requiredPowerMode === 'manual' ? ' (手动指定)' : ' (自动计算)'),
         '查表单节功率: ' + fmt(r.wattPerCellLookup) + ' W/cell',
         '单节电池可提供总功率: ' + fmt(r.powerPerUnit) + ' W',
@@ -2276,74 +2542,738 @@ function fallbackCopy(text, done) {
     document.body.removeChild(ta);
 }
 document.getElementById('copyConfigBtn').addEventListener('click', copyConfigSummary);
-function exportConfigTable() {
-    if (!lastExportInputs || !lastExportResult) return;
+// ══════════════════════════════════════════════════════════════════
+// EXPORT MODAL & MULTI-FORMAT EXPORT ENGINE (EXCEL / PDF / HTML)
+// ══════════════════════════════════════════════════════════════════
+const BRIEF_EXPORT_PARAM_IDS = new Set([
+    'ac_model', 'ac_sys_volt', 'ac_epv_cell', 'ac_epv_block', 'ac_cells_string',
+    'ac_blocks_group', 'ac_num_strings', 'ac_total_qty', 'ac_nom_volt', 'ac_float_volt',
+    'ac_dis_lower', 'ac_chg_upper', 'ac_backup_time', 'ac_req_power', 'ac_power_per_str',
+    'ac_proposed_power', 'ac_max_current', 'ac_max_current_str', 'ac_sat_ratio',
+    'ac_energy_sat', 'ac_energy_wh_ratio', 'ac_total_energy',
+    'dc_model', 'dc_sys_volt', 'dc_cutoff', 'dc_charge', 'dc_blocks', 'dc_strings',
+    'dc_total_qty', 'dc_duration', 'dc_currents', 'dc_lookup_a', 'dc_avail_a',
+    'dc_sat_ratio', 'dc_energy'
+]);
+
+let exportModalState = {
+    selectedIds: new Set(),
+    allRows: [],
+    format: 'xlsx',
+    exportLang: 'zh',
+    filterText: '',
+    title: '',
+    subTitle: '',
+    upsLabel: '',
+    inputs: null,
+    r: null,
+    dc: null
+};
+
+function getExportDataset(targetLang) {
+    if (!lastExportInputs || (!lastExportResult && !lastExportDc)) return null;
     const inputs = lastExportInputs;
     const r = lastExportResult;
+    const dc = lastExportDc;
+    const lang = targetLang || exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
+
     const model = BATTERY_MODEL_MAP[inputs.batteryModelId];
     const modelLabel = model ? (inputs.batteryModelId + ' (' + model.specs.label + ')') : inputs.batteryModelId;
-    const temp = inputs.temperature;
-    const upsLabel = fmt(inputs.upsRatingKva, 0) + 'KVA UPS';
-    const rows = [
-        { label: '电池型号', value: modelLabel, highlight: false },
-        { label: '系统工作电压', value: fmt(inputs.systemVoltage, 1) + ' V', highlight: false },
-        { label: '单节电芯截止电压 (EPV)', value: inputs.epv + ' V', highlight: false },
-        { label: '单节电池截止电压 (EPV×8)', value: (inputs.epv * 8).toFixed(2) + ' V', highlight: false },
-        { label: '单组电芯总节数', value: inputs.cellsPerString + ' 节', highlight: false },
-        { label: '单组电池块数', value: r.blocksPerGroup + ' 块', highlight: false },
-        { label: '配置电池组数', value: inputs.numberOfStrings + ' 组', highlight: false },
-        { label: '电池总数量', value: r.totalQuantity + ' 块', highlight: true },
-        { label: '配置标称电压', value: fmt(r.configNominalVoltage, 1) + ' V', highlight: false },
-        { label: '配置浮充电压 (' + temp + '℃)', value: fmt(r.configFloatVoltage, 1) + ' V', highlight: false },
-        { label: '放电下限电压', value: fmt(r.voltageValidation.batteryDischargeLower, 1) + ' V', highlight: false },
-        { label: '充电上限电压 (' + temp + '℃)', value: fmt(r.voltageValidation.batteryChargeUpper, 1) + ' V', highlight: false },
-        { label: '要求备电时间', value: formatBackupTimeLabel(backupTimeMin), highlight: false },
-        { label: '电池总功率需求', value: fmt(r.totalRequiredPower / 1000, 2) + ' kW', highlight: true },
-        { label: '单组可提供总功率', value: fmt(r.totalPowerPerString / 1000, 2) + ' kW', highlight: true },
-        { label: '配置总功率', value: fmt(r.totalProposedPower / 1000, 2) + ' kW', highlight: true },
-        { label: '电池最大放电电流', value: fmt(r.maxCurrent, 1) + ' A', highlight: true },
-        { label: '单组最大电流', value: fmt(r.maxCurrentPerString, 1) + ' A', highlight: true },
-        { label: '功率满足率', value: (r.satisfactionRatio * 100).toFixed(1) + ' %', highlight: true },
-        ...((typeof calcMode !== 'undefined' && calcMode === 'power' && !r.isDuty) ? [
-            { label: '能量满足率（查表口径）', value: (r.energySatisfactionRatio * 100).toFixed(1) + ' %', highlight: true },
-            { label: '查表可用能量 / 需求能量', value: fmt(r.providedEnergyWh / 1000, 2) + ' / ' + fmt(r.requiredEnergyWh / 1000, 2) + ' kWh', highlight: false }
-        ] : []),
-        { label: '系统总能量', value: fmt(r.totalEnergyKWh, 2) + ' kWh', highlight: false },
-    ];
-    const rowsHtml = rows.map(row => {
-        const style = row.highlight
-            ? 'background:#fff3cd; color:#7c5200; font-weight:600;'
-            : 'background:#ffffff; color:#1a1a1a;';
-        return `<tr><td style="padding:9px 16px;border:1px solid #d0d7de;font-size:13px;color:#444;background:#f6f8fa;font-weight:500;width:220px;">${row.label}</td><td style="padding:9px 16px;border:1px solid #d0d7de;font-size:13px;${style}">${row.value}</td></tr>`;
+    const temp = inputs.temperature + '℃';
+    const cat = (cZh, cEn) => isEn ? cEn : cZh;
+
+    let title = isEn ? 'Ni-Zn Battery System Configuration Solution' : '锌镍电池系统配置方案';
+    let subTitle = '';
+    let upsLabel = '';
+    const rows = [];
+
+    if (calcMode === 'dc' && dc) {
+        upsLabel = fmt(inputs.dcSystemVoltage, 0) + (isEn ? 'V DC UPS' : 'V 直流 UPS');
+        subTitle = `${upsLabel} · ${modelLabel}`;
+        const isDcVoltMatched = dc ? (Boolean(dc.dischargeWithinBus) && Boolean(dc.chargeWithinBus)) : true;
+        
+        rows.push(
+            { id: 'dc_model', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Battery Model' : '电池型号', value: modelLabel, highlight: false, defaultSelected: true },
+            { id: 'dc_sys_volt', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'System Operating Voltage (Vdc)' : '系统工作电压 (Vdc)', value: fmt(inputs.dcSystemVoltage, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'dc_margin', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Design Margin' : '设计余量', value: fmt(inputs.designMargin || 1, 2), highlight: false, defaultSelected: true },
+            { id: 'dc_aging', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Aging Factor' : '老化系数', value: fmt(inputs.agingFactor || 1, 2), highlight: false, defaultSelected: true },
+            { id: 'dc_mode', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'System Calculation Mode' : '系统计算模式', value: isEn ? 'DC UPS Mode' : '直流 UPS 模式 (DC UPS Mode)', highlight: false, defaultSelected: true },
+            { id: 'dc_bus_range', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'DC Bus Voltage Range' : '母线工作电压范围', value: fmt(inputs.dcVoltMin, 1) + ' V ~ ' + fmt(inputs.dcVoltMax, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'dc_cutoff', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'Cutoff Voltage Verification' : '截止电压核算', value: isEn ? ('CC Discharge ' + dc.cellDis.toFixed(2) + ' V/cell → End Bus ' + fmt(dc.batteryDischargeLower, 1) + ' V (Min ' + fmt(dc.vMin, 1) + ' V)') : ('恒流放电 ' + dc.cellDis.toFixed(2) + ' V/cell → 截止母线 ' + fmt(dc.batteryDischargeLower, 1) + ' V (最低允许 ' + fmt(dc.vMin, 1) + ' V)'), highlight: false, defaultSelected: true },
+            { id: 'dc_charge', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'Charge Upper Limit Verification' : '充电上限核算', value: isEn ? ('Cell ' + dc.cellChg.toFixed(3) + ' V/cell → Charge Bus Upper ' + fmt(dc.batteryChargeUpper, 1) + ' V (Max ' + fmt(dc.vMax, 1) + ' V)') : ('单节 ' + dc.cellChg.toFixed(3) + ' V/cell → 充电母线上限 ' + fmt(dc.batteryChargeUpper, 1) + ' V (最高允许 ' + fmt(dc.vMax, 1) + ' V)'), highlight: false, defaultSelected: true },
+            { id: 'dc_volt_status', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'Voltage Boundary Status' : '电压边界匹配状态', value: isDcVoltMatched ? (isEn ? '✓ Matched (Within range)' : '✓ 正常匹配 (范围内)') : (isEn ? '⚠ Out of Allowable Window' : '⚠ 超出允许窗口'), highlight: !isDcVoltMatched, defaultSelected: true },
+            { id: 'dc_blocks', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Blocks per String' : '单组电池块数', value: dc.blocks + (isEn ? ' Blocks (' : ' 块 (') + dc.cells + (isEn ? ' Cells)' : ' 节)'), highlight: false, defaultSelected: true },
+            { id: 'dc_strings', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Number of Parallel Strings' : '配置电池组数', value: dc.strings + (isEn ? ' Strings Parallel' : ' 组并联'), highlight: false, defaultSelected: true },
+            { id: 'dc_total_qty', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Total Battery Quantity' : '电池总数量', value: dc.totalQuantity + (isEn ? ' Blocks' : ' 块'), highlight: true, defaultSelected: true },
+            { id: 'dc_duty_type', category: cat('工况负荷需求', 'Load & Duty Profile'), label: isEn ? 'Load Profile Type' : '工况负荷类型', value: (dcLoadMode === 'duty' ? (isEn ? 'IEEE 485 Duty Cycle Load' : 'IEEE 485 阶梯负荷工况') : (isEn ? 'Continuous Constant Current/Power' : '持续恒流/恒功率负荷')), highlight: false, defaultSelected: true },
+            { id: 'dc_duration', category: cat('工况负荷需求', 'Load & Duty Profile'), label: isEn ? 'Required Backup Duration' : '要求备电时间', value: fmt(dc.totalDurationMin, 1) + ' min (' + (dc.totalDurationMin/60).toFixed(1) + ' h)', highlight: false, defaultSelected: true },
+            { id: 'dc_req_ah', category: cat('容量与放电校核', 'Capacity & Discharge Audit'), label: isEn ? 'Cumulative Energy Demand' : '工况累计电量需求', value: fmt(dc.rawRequiredAh, 2) + ' Ah (' + (isEn ? 'Design: ' : '设计需求 ') + fmt(dc.adjustedRequiredAh, 1) + ' Ah)', highlight: false, defaultSelected: true },
+            { id: 'dc_currents', category: cat('容量与放电校核', 'Capacity & Discharge Audit'), label: isEn ? 'Continuous / Peak Pulse Current' : '持续负荷 / 峰值冲击电流', value: fmt(dc.adjustedContCurrentA, 1) + ' A / ' + fmt(dc.adjustedPeakCurrentA, 1) + ' A', highlight: false, defaultSelected: true },
+            { id: 'dc_lookup_a', category: cat('容量与放电校核', 'Capacity & Discharge Audit'), label: isEn ? 'Constant Current Discharge Capability' : '恒流放电能力', value: fmt(dc.cellDischargeA, 1) + ' A/cell @ EPV ' + dc.matchedEpvKey + 'V, ' + dc.matchedTime + 'min', highlight: false, defaultSelected: true },
+            { id: 'dc_avail_a', category: cat('容量与放电校核', 'Capacity & Discharge Audit'), label: isEn ? 'Total Available Discharge Capability' : '单组可提供总功率/放电能力', value: fmt(dc.totalAvailDischargeA, 1) + ' A', highlight: true, defaultSelected: true },
+            { id: 'dc_sat_ratio', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Power / Current Satisfaction Ratio' : '功率满足率 / 电流满足率', value: (dc.currentSatRatio * 100).toFixed(1) + ' %', highlight: true, defaultSelected: true },
+            { id: 'dc_pulse', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Peak Pulse C-Rate & Margin' : '峰值脉冲倍率与裕度', value: isEn ? (dc.peakCrate.toFixed(2) + ' C (Per String ' + fmt(dc.peakCurrentPerString, 1) + ' A, Limit ' + dc.maxAllowedPulseA + ' A, Margin ' + dc.pulseMarginRatio.toFixed(1) + 'x)') : (dc.peakCrate.toFixed(2) + ' C (单组 ' + fmt(dc.peakCurrentPerString, 1) + ' A，极限 ' + dc.maxAllowedPulseA + ' A，裕度 ' + dc.pulseMarginRatio.toFixed(1) + 'x)'), highlight: false, defaultSelected: true },
+            { id: 'dc_energy', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Total System Energy' : '系统总能量', value: fmt(dc.totalEnergyKWh, 2) + ' kWh (' + (isEn ? 'Rated Capacity ' : '额定总容量 ') + dc.ratedTotalAh + ' Ah)', highlight: false, defaultSelected: true },
+            { id: 'dc_weight', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Estimated Total Net Weight' : '系统总净重 (预估)', value: fmt(dc.totalWeight, 1) + ' kg', highlight: false, defaultSelected: true },
+            { id: 'dc_volume', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Estimated Total Volume' : '系统预估总体积', value: fmt(dc.totalVolume, 3) + ' m³', highlight: false, defaultSelected: true },
+            { id: 'dc_temp', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Operating Ambient Temperature' : '运行环境温度', value: inputs.temperature + (isEn ? ' ℃ (Non-HVAC Wide Temp Range)' : ' ℃ (免空调宽温运行)'), highlight: false, defaultSelected: true }
+        );
+    } else {
+        upsLabel = fmt(inputs.upsRatingKva, 0) + (isEn ? 'kVA UPS' : 'KVA UPS');
+        subTitle = `${upsLabel} · ${modelLabel}`;
+        const isVoltMatched = r.voltageValidation
+            ? (Boolean(r.voltageValidation.matched) || (Boolean(r.voltageValidation.dischargeInRange) && Boolean(r.voltageValidation.chargeInRange)))
+            : true;
+
+        rows.push(
+            { id: 'ac_model', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Battery Model' : '电池型号', value: modelLabel, highlight: false, defaultSelected: true },
+            { id: 'ac_sys_volt', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'System Operating Voltage (Vdc)' : '系统工作电压 (Vdc)', value: fmt(inputs.systemVoltage, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_pf', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Power Factor (PF)' : '功率因数 (PF)', value: fmt(inputs.powerFactor, 2), highlight: false, defaultSelected: true },
+            { id: 'ac_eff', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Inverter Efficiency' : '逆变器效率', value: ((inputs.inverterEfficiency || 1) * 100).toFixed(1) + ' %', highlight: false, defaultSelected: true },
+            { id: 'ac_margin', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Design Margin' : '设计余量', value: fmt(inputs.designMargin || 1, 2), highlight: false, defaultSelected: true },
+            { id: 'ac_aging', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Aging Factor' : '老化系数', value: fmt(inputs.agingFactor || 1, 2), highlight: false, defaultSelected: true },
+            { id: 'ac_calc_mode', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'System Calculation Mode' : '系统计算模式', value: (calcMode === 'power' ? (isEn ? 'AC Power Mode' : '交流功率模式 (Power Mode)') : (calcMode === 'capacity' ? (isEn ? 'AC Capacity Mode' : '交流容量模式 (Capacity Mode)') : (isEn ? 'Duty Cycle Mode' : '阶梯工况分析模式'))), highlight: false, defaultSelected: true },
+            { id: 'ac_epv_cell', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Cell Cutoff Voltage (EPV)' : '单节电芯截止电压 (EPV)', value: inputs.epv + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_epv_block', category: cat('基础电气规格', 'Basic Electrical Specs'), label: isEn ? 'Block Cutoff Voltage (EPV×8)' : '单节电池截止电压 (EPV×8)', value: (inputs.epv * 8).toFixed(2) + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_cells_string', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Total Cells per String' : '单组电芯总节数', value: inputs.cellsPerString + (isEn ? ' Cells' : ' 节'), highlight: false, defaultSelected: true },
+            { id: 'ac_blocks_group', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Blocks per String' : '单组电池块数', value: r.blocksPerGroup + (isEn ? ' Blocks' : ' 块'), highlight: false, defaultSelected: true },
+            { id: 'ac_num_strings', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Configured Parallel Strings' : '配置电池组数', value: inputs.numberOfStrings + (isEn ? ' Strings' : ' 组'), highlight: false, defaultSelected: true },
+            { id: 'ac_total_qty', category: cat('电池组拓扑', 'Battery String Topology'), label: isEn ? 'Total Battery Quantity' : '电池总数量', value: r.totalQuantity + (isEn ? ' Blocks' : ' 块'), highlight: true, defaultSelected: true },
+            { id: 'ac_nom_volt', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'Configured Nominal Voltage' : '配置标称电压', value: fmt(r.configNominalVoltage, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_float_volt', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? ('Configured Float Voltage (' + temp + ')') : ('配置浮充电压 (' + temp + ')'), value: fmt(r.configFloatVoltage, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_dis_lower', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'Discharge Lower Limit' : '放电下限电压', value: fmt(r.voltageValidation.batteryDischargeLower, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_chg_upper', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? ('Charge Upper Limit (' + temp + ')') : ('充电上限电压 (' + temp + ')'), value: fmt(r.voltageValidation.batteryChargeUpper, 1) + ' V', highlight: false, defaultSelected: true },
+            { id: 'ac_volt_status', category: cat('电压边界校验', 'Voltage Boundary Check'), label: isEn ? 'Voltage Boundary Status' : '电压边界匹配状态', value: isVoltMatched ? (isEn ? '✓ Matched (Within range)' : '✓ 正常匹配 (范围内)') : (isEn ? '⚠ Out of Allowable Window' : '⚠ 超出允许窗口'), highlight: !isVoltMatched, defaultSelected: true },
+            { id: 'ac_backup_time', category: cat('功率与负荷需求', 'Power & Load Demand'), label: isEn ? 'Required Backup Duration' : '要求备电时间', value: formatBackupTimeLabel(backupTimeMin, isEn ? 'en' : 'zh'), highlight: false, defaultSelected: true },
+            { id: 'ac_req_power', category: cat('功率与负荷需求', 'Power & Load Demand'), label: isEn ? 'Total Battery Power Demand' : '电池总功率需求', value: fmt(r.totalRequiredPower / 1000, 2) + ' kW', highlight: true, defaultSelected: true },
+            { id: 'ac_cell_lookup_w', category: cat('功率与负荷需求', 'Power & Load Demand'), label: isEn ? 'Discharge Capability per Cell' : '单节放电功率能力', value: fmt(r.wattPerCellLookup) + ' W/cell', highlight: false, defaultSelected: true },
+            { id: 'ac_power_per_unit', category: cat('功率与负荷需求', 'Power & Load Demand'), label: isEn ? 'Available Power per Block' : '单节电池可提供总功率', value: fmt(r.powerPerUnit) + ' W', highlight: false, defaultSelected: true },
+            { id: 'ac_power_per_str', category: cat('功率与负荷需求', 'Power & Load Demand'), label: isEn ? 'Available Power per String' : '单组可提供总功率', value: fmt(r.totalPowerPerString / 1000, 2) + ' kW', highlight: true, defaultSelected: true },
+            { id: 'ac_proposed_power', category: cat('功率与负荷需求', 'Power & Load Demand'), label: isEn ? 'Total Proposed Power' : '配置总功率', value: fmt(r.totalProposedPower / 1000, 2) + ' kW', highlight: true, defaultSelected: true },
+            { id: 'ac_max_current', category: cat('电流与放电校核', 'Current & Discharge Audit'), label: isEn ? 'Max Battery Discharge Current' : '电池最大放电电流', value: fmt(r.maxCurrent, 1) + ' A', highlight: true, defaultSelected: true },
+            { id: 'ac_max_current_str', category: cat('电流与放电校核', 'Current & Discharge Audit'), label: isEn ? 'Max Current per String' : '单组最大电流', value: fmt(r.maxCurrentPerString, 1) + ' A', highlight: true, defaultSelected: true },
+            { id: 'ac_sat_ratio', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Power Satisfaction Ratio' : '功率满足率', value: (r.satisfactionRatio * 100).toFixed(1) + ' %', highlight: true, defaultSelected: true },
+            ...((calcMode === 'power' && !r.isDuty) ? [
+                { id: 'ac_energy_sat', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Energy Satisfaction Ratio' : '能量满足率', value: (r.energySatisfactionRatio * 100).toFixed(1) + ' %', highlight: true, defaultSelected: true },
+                { id: 'ac_energy_wh_ratio', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Available Energy / Required Energy' : '可用能量 / 需求能量', value: fmt(r.providedEnergyWh / 1000, 2) + ' / ' + fmt(r.requiredEnergyWh / 1000, 2) + ' kWh', highlight: false, defaultSelected: true }
+            ] : []),
+            { id: 'ac_est_runtime', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Estimated Backup Runtime' : '预估后备时间', value: fmt(r.estimatedRunTime, 1) + (isEn ? ' mins' : ' 分钟'), highlight: false, defaultSelected: true },
+            { id: 'ac_total_energy', category: cat('满足率与能量', 'Satisfaction & Energy'), label: isEn ? 'Total System Energy' : '系统总能量', value: fmt(r.totalEnergyKWh, 2) + ' kWh', highlight: false, defaultSelected: true },
+            { id: 'ac_weight', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Estimated Total Net Weight' : '系统预估总净重', value: fmt(r.totalQuantity * (model ? model.specs.weightKg : 17.3), 1) + ' kg', highlight: false, defaultSelected: true },
+            { id: 'ac_volume', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Estimated Total Volume' : '系统预估总体积', value: (r.totalQuantity * ((model?.specs?.lengthMm||260) * (model?.specs?.widthMm||175) * (model?.specs?.heightMm||220)) / 1e9).toFixed(3) + ' m³', highlight: false, defaultSelected: true },
+            { id: 'ac_temp', category: cat('物理规格与环境', 'Physical Specs & Environment'), label: isEn ? 'Design Ambient Temperature' : '设计工作温度', value: inputs.temperature + (isEn ? ' ℃ (Wide Temp Tolerance)' : ' ℃ (宽温耐受)'), highlight: false, defaultSelected: true }
+        );
+    }
+
+    return { title, subTitle, upsLabel, rows, inputs, r, dc };
+}
+
+function updateExportModalStaticTexts(lang) {
+    const isEn = lang === 'en';
+    const setT = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+
+    setT('exportModalTitleText', isEn ? 'Export Configuration Table & Proposal Preview' : '导出配置表格与方案预览');
+    setT('exportModalBadgeText', isEn ? 'Professional Report' : '专业报表');
+    setT('exportModalSubtitleText', isEn ? 'Select parameters · Real-time preview · Matching Excel / PDF export' : '勾选导出参数 · 实时无需下载预览 · 样式一致的高保真 Excel / PDF 导出');
+
+    setT('exportParamCheckTitle', isEn ? 'Parameters Selection' : '参数勾选');
+    setT('exportSelectAllBtn', isEn ? 'Select All' : '全选');
+    setT('exportBriefBtn', isEn ? 'Brief' : '简要版');
+    setT('exportInvertBtn', isEn ? 'Invert' : '反选');
+    setT('exportClearBtn', isEn ? 'Clear' : '清空');
+    setT('exportKeyOnlyBtn', isEn ? 'Key Only' : '仅重点');
+
+    const filterInput = document.getElementById('exportParamFilterInput');
+    if (filterInput) filterInput.placeholder = isEn ? 'Filter parameter name (e.g. power, voltage)...' : '快速筛选参数名称（如：功率、电压、电流）...';
+
+    setT('exportLangLabelText', isEn ? 'Export Table Language' : '导出表格语言');
+    setT('exportLangSubText', isEn ? 'Syncs live preview & exported files' : '实时联动预览与导出文件');
+    setT('exportLangZhText', isEn ? '🇨🇳 Chinese (中文)' : '🇨🇳 中文报表');
+    setT('exportLangEnText', isEn ? '🇺🇸 English (英文)' : '🇺🇸 英文报表');
+
+    setT('exportFormatLabel', isEn ? 'Export File Format' : '导出文件格式');
+    setT('exportFormatHint', isEn ? 'Strictly matching formatting across Excel and PDF' : 'Excel 与 PDF 样式与排版严格一致');
+    setT('exportPrintBtnText', isEn ? 'Print' : '打印');
+    setT('exportPreviewHeaderTitle', isEn ? 'Real-time Preview (Live View)' : '实时导出预览 (无需下载直接查看)');
+
+    const btnText = document.getElementById('exportDownloadBtnText');
+    if (btnText) {
+        if (exportModalState.format === 'xlsx') btnText.textContent = isEn ? 'Download Excel (.xlsx)' : '下载 Excel 表格 (.xlsx)';
+        else if (exportModalState.format === 'pdf') btnText.textContent = isEn ? 'Download PDF (.pdf)' : '下载 PDF 文档 (.pdf)';
+        else btnText.textContent = isEn ? 'Download HTML (.html)' : '下载 HTML 网页 (.html)';
+    }
+}
+
+function openExportModal() {
+    exportModalState.exportLang = (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const radios = document.querySelectorAll('input[name="exportLangRadio"]');
+    radios.forEach(r => {
+        r.checked = (r.value === exportModalState.exportLang);
+    });
+
+    const data = getExportDataset(exportModalState.exportLang);
+    if (!data) {
+        alert((typeof currentLang !== 'undefined' && currentLang === 'en') ? 'No valid calculation results yet. Please calculate first!' : '当前尚无有效计算结果，请先输入负荷或电芯参数完成计算！');
+        return;
+    }
+    exportModalState.title = data.title;
+    exportModalState.subTitle = data.subTitle;
+    exportModalState.upsLabel = data.upsLabel;
+    exportModalState.allRows = data.rows;
+    exportModalState.inputs = data.inputs;
+    exportModalState.r = data.r;
+    exportModalState.dc = data.dc;
+
+    exportModalState.selectedIds = new Set(data.rows.map(item => item.id));
+    exportModalState.filterText = '';
+    const filterInput = document.getElementById('exportParamFilterInput');
+    if (filterInput) filterInput.value = '';
+
+    const modal = document.getElementById('exportModal');
+    if (modal) {
+        modal.style.display = 'flex';
+        renderExportChecklist();
+        renderExportPreview();
+        updateExportModalStaticTexts(exportModalState.exportLang);
+        lucide.createIcons();
+    }
+}
+
+function closeExportModal() {
+    const modal = document.getElementById('exportModal');
+    if (modal) modal.style.display = 'none';
+}
+
+function renderExportChecklist() {
+    const container = document.getElementById('exportParamsListContainer');
+    const badge = document.getElementById('exportSelectedCountBadge');
+    if (!container) return;
+
+    const lang = exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
+
+    const filter = (exportModalState.filterText || '').trim().toLowerCase();
+    const rows = exportModalState.allRows.filter(row => {
+        if (!filter) return true;
+        return row.label.toLowerCase().includes(filter) ||
+               row.category.toLowerCase().includes(filter) ||
+               String(row.value).toLowerCase().includes(filter) ||
+               (row.id && row.id.toLowerCase().includes(filter));
+    });
+
+    const totalSelected = exportModalState.selectedIds.size;
+    const totalRows = exportModalState.allRows.length;
+    if (badge) {
+        badge.textContent = isEn
+            ? `${totalSelected === totalRows ? 'All ' : ''}${totalSelected}/${totalRows} Items`
+            : `${totalSelected === totalRows ? '全选 ' : ''}${totalSelected}/${totalRows} 项`;
+        badge.className = `rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold ${totalSelected > 0 ? 'bg-ok/15 text-ok' : 'bg-bad/15 text-bad'}`;
+    }
+
+    if (rows.length === 0) {
+        container.innerHTML = `<div class="p-6 text-center text-xs text-ink3">${isEn ? 'No matching parameters' : '无匹配参数，请清空搜索条件'}</div>`;
+        return;
+    }
+
+    const categories = [];
+    const catMap = new Map();
+    rows.forEach(r => {
+        if (!catMap.has(r.category)) {
+            catMap.set(r.category, []);
+            categories.push(r.category);
+        }
+        catMap.get(r.category).push(r);
+    });
+
+    let html = '';
+    categories.forEach(cat => {
+        const catRows = catMap.get(cat);
+        const catSelectedCount = catRows.filter(r => exportModalState.selectedIds.has(r.id)).length;
+        const allCatSelected = catSelectedCount === catRows.length;
+
+        html += `<div class="rounded-xl border border-line/60 bg-elev/40 p-2.5 space-y-1.5">
+            <div class="flex items-center justify-between px-1 pb-1 border-b border-line/40">
+                <span class="text-[11px] font-bold text-ink2">${cat}</span>
+                <button type="button" class="export-cat-toggle-btn text-[10px] text-accent hover:underline font-medium" data-cat="${cat}">
+                    ${isEn ? (allCatSelected ? 'Deselect Category' : 'Select Category') : (allCatSelected ? '取消全类' : '勾选全类')} (${catSelectedCount}/${catRows.length})
+                </button>
+            </div>
+            <div class="space-y-1">`;
+
+        catRows.forEach(row => {
+            const isChecked = exportModalState.selectedIds.has(row.id);
+            html += `<label class="export-checklist-item" data-id="${row.id}">
+                <div class="flex items-center gap-2 min-w-0">
+                    <input type="checkbox" class="export-param-check h-3.5 w-3.5 accent-blue-600 rounded cursor-pointer" data-id="${row.id}" ${isChecked ? 'checked' : ''}>
+                    <span class="text-xs truncate ${row.highlight ? 'font-bold text-ink' : 'text-ink2'}">${row.label}</span>
+                    ${row.highlight ? `<span class="rounded bg-amber-500/15 px-1 py-0.2 text-[9px] font-bold text-amber-500">${isEn ? 'Key' : '重点'}</span>` : ''}
+                </div>
+                <span class="text-[11px] font-mono text-ink3 truncate max-w-[130px] text-right" title="${row.value}">${row.value}</span>
+            </label>`;
+        });
+
+        html += `</div></div>`;
+    });
+
+    container.innerHTML = html;
+
+    container.querySelectorAll('.export-param-check').forEach(chk => {
+        chk.addEventListener('change', (e) => {
+            const id = e.target.getAttribute('data-id');
+            if (e.target.checked) exportModalState.selectedIds.add(id);
+            else exportModalState.selectedIds.delete(id);
+            renderExportChecklist();
+            renderExportPreview();
+        });
+    });
+
+    container.querySelectorAll('.export-cat-toggle-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const cat = e.target.getAttribute('data-cat');
+            const catRows = catMap.get(cat) || [];
+            const catSelectedCount = catRows.filter(r => exportModalState.selectedIds.has(r.id)).length;
+            const target = catSelectedCount < catRows.length;
+            catRows.forEach(r => {
+                if (target) exportModalState.selectedIds.add(r.id);
+                else exportModalState.selectedIds.delete(r.id);
+            });
+            renderExportChecklist();
+            renderExportPreview();
+        });
+    });
+}
+
+function renderExportPreview() {
+    const paper = document.getElementById('exportPreviewPaper');
+    const rowCountEl = document.getElementById('exportPreviewRowCount');
+    if (!paper) return;
+
+    const lang = exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
+
+    const selectedRows = exportModalState.allRows.filter(r => exportModalState.selectedIds.has(r.id));
+    if (rowCountEl) {
+        rowCountEl.textContent = `${selectedRows.length} ${isEn ? 'Items' : '项参数'}`;
+    }
+
+    if (selectedRows.length === 0) {
+        paper.innerHTML = `<div class="p-12 text-center text-slate-500 bg-white rounded-xl">
+            <div class="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-600">
+                <i data-lucide="alert-circle" class="h-6 w-6"></i>
+            </div>
+            <p class="font-bold text-slate-700 text-sm">${isEn ? 'No parameters selected' : '未勾选任何导出参数'}</p>
+            <p class="text-xs text-slate-400 mt-1">${isEn ? 'Please select at least one parameter on the left to generate the configuration sheet.' : '请在左侧列表中勾选至少一个参数以实时生成配置表格'}</p>
+        </div>`;
+        lucide.createIcons();
+        return;
+    }
+
+    const now = new Date();
+    const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+
+    const rowsHtml = selectedRows.map(row => {
+        const valStyle = row.highlight
+            ? 'background:#fff3cd; color:#7c5200; font-weight:700;'
+            : 'background:#ffffff; color:#0f172a; font-weight:500;';
+        return `<tr>
+            <td style="padding:9px 16px; border:1px solid #d0d7de; font-size:12.5px; color:#334155; background:#f8fafc; font-weight:600; width:42%; text-align:left;">${row.label}</td>
+            <td style="padding:9px 16px; border:1px solid #d0d7de; font-size:12.5px; width:58%; text-align:left; ${valStyle}">${row.value}</td>
+        </tr>`;
     }).join('');
-    const tableHtml = `<!DOCTYPE html>
-<html lang="zh-CN"><head><meta charset="UTF-8">
-<title>电池配置方案 — ${upsLabel}</title>
+
+    paper.innerHTML = `
+        <!-- 报表顶栏 -->
+        <div style="background:linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); color:#ffffff; padding:18px 24px;">
+            <div>
+                <h2 style="font-size:17px; font-weight:800; margin:0; line-height:1.3; letter-spacing:0.3px;">${exportModalState.title}</h2>
+                <p style="font-size:12px; margin:4px 0 0 0; color:#bfdbfe; font-weight:500;">${exportModalState.subTitle}</p>
+            </div>
+        </div>
+
+        <!-- 报表元信息栏 -->
+        <div style="background:#f8fafc; border-bottom:1px solid #e2e8f0; padding:8px 24px; display:flex; justify-content:space-between; align-items:center; font-size:11px; color:#64748b; font-family:'Microsoft YaHei', Arial, sans-serif;">
+            <span>${isEn ? 'Project Specification' : '项目口径'}: <strong style="color:#334155;">${exportModalState.upsLabel}</strong></span>
+            <span>${isEn ? 'Date' : '日期'}: <strong style="color:#334155;">${dateStr}</strong></span>
+        </div>
+
+        <!-- 表格主体 -->
+        <table style="border-collapse:collapse; width:100%; margin:0;">
+            <thead>
+                <tr>
+                    <th style="background:#1d4ed8; color:#ffffff; font-size:13px; font-weight:700; padding:11px 16px; text-align:left; border:1px solid #1d4ed8; width:42%;">${isEn ? 'Configuration Item (Item)' : '配置项目 (Item)'}</th>
+                    <th style="background:#1d4ed8; color:#ffffff; font-size:13px; font-weight:700; padding:11px 16px; text-align:left; border:1px solid #1d4ed8; width:58%;">${isEn ? 'Design Parameter (Value)' : '设计参数 (Value)'}</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${rowsHtml}
+            </tbody>
+        </table>
+
+        <!-- 报表底栏说明 -->
+        <div style="background:#f8fafc; border-top:1px solid #e2e8f0; padding:10px 24px; font-size:11px; color:#64748b; line-height:1.5;">
+            <strong>${isEn ? 'Technical Note: ' : '技术说明：'}</strong>${isEn ? 'Configuration parameters are strictly verified in accordance with manufacturer technical specifications and IEEE 485 international standards.' : '本配置表数据严格基于产品官方规格书与 IEEE 485 国际标准进行工程校核与自动验算。'}
+        </div>
+    `;
+    lucide.createIcons();
+}
+
+async function downloadExportFile() {
+    const lang = exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
+
+    const selectedRows = exportModalState.allRows.filter(r => exportModalState.selectedIds.has(r.id));
+    if (selectedRows.length === 0) {
+        alert(isEn ? 'Please select at least one parameter before exporting!' : '请至少勾选一个参数后再导出！');
+        return;
+    }
+
+    const ts = new Date().toISOString().slice(0,10);
+    const modelId = exportModalState.inputs ? exportModalState.inputs.batteryModelId : 'Battery';
+    const baseName = (isEn ? `Battery_Configuration_${modelId}_${ts}` : `电池配置方案_${modelId}_${ts}`);
+
+    const downloadBtn = document.getElementById('exportDownloadBtn');
+    const oldText = downloadBtn ? downloadBtn.innerHTML : '';
+    if (downloadBtn) {
+        downloadBtn.disabled = true;
+        downloadBtn.innerHTML = `<span class="inline-block animate-spin mr-1.5">⏳</span>${isEn ? 'Generating...' : '正在生成...'}`;
+    }
+
+    try {
+        if (exportModalState.format === 'xlsx') {
+            await exportToExcel(exportModalState.title, exportModalState.subTitle, selectedRows, baseName + '.xlsx', lang);
+        } else if (exportModalState.format === 'pdf') {
+            await exportToPdf(document.getElementById('exportPreviewPaper'), baseName + '.pdf');
+        } else {
+            exportToHtml(exportModalState.title, exportModalState.subTitle, selectedRows, baseName + '.html', lang);
+        }
+    } catch(err) {
+        console.error('Export error:', err);
+        alert((isEn ? 'Export failed: ' : '导出失败: ') + (err.message || err));
+    } finally {
+        if (downloadBtn) {
+            downloadBtn.disabled = false;
+            downloadBtn.innerHTML = oldText;
+            lucide.createIcons();
+        }
+    }
+}
+
+async function exportToExcel(title, subTitle, selectedRows, filename, targetLang) {
+    const lang = targetLang || exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
+    const sheetName = isEn ? 'Battery Configuration' : '电池配置方案';
+    const colItemName = isEn ? 'Configuration Item (Item)' : '配置项目 (Item)';
+    const colValName = isEn ? 'Design Parameter (Value)' : '设计参数 (Value)';
+    const dateLabel = isEn ? 'Date: ' : '日期: ';
+
+    if (window.ExcelJS) {
+        const wb = new window.ExcelJS.Workbook();
+        wb.creator = isEn ? 'Ni-Zn Battery Solution' : '电池配置方案';
+        wb.lastModifiedBy = isEn ? 'Ni-Zn Battery Solution' : '电池配置方案';
+        wb.created = new Date();
+        wb.modified = new Date();
+
+        const ws = wb.addWorksheet(sheetName, {
+            views: [{ showGridLines: true }],
+            pageSetup: { paperSize: 9, orientation: 'portrait', fitToPage: true, fitToWidth: 1, fitToHeight: 0 }
+        });
+
+        const borderThin = {
+            top: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+            left: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+            bottom: { style: 'thin', color: { argb: 'FFD0D7DE' } },
+            right: { style: 'thin', color: { argb: 'FFD0D7DE' } }
+        };
+
+        // Row 1: Main Title
+        ws.mergeCells('A1:B1');
+        const titleCell = ws.getCell('A1');
+        titleCell.value = title || (isEn ? 'Ni-Zn Battery System Configuration Solution' : '锌镍电池系统配置方案');
+        titleCell.font = { name: 'Microsoft YaHei', size: 14, bold: true, color: { argb: 'FFFFFFFF' } };
+        titleCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+        titleCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        ws.getRow(1).height = 36;
+
+        // Row 2: Subtitle & Date
+        ws.mergeCells('A2:B2');
+        const metaCell = ws.getCell('A2');
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        metaCell.value = `${subTitle ? subTitle + '   |   ' : ''}${dateLabel}${dateStr}`;
+        metaCell.font = { name: 'Microsoft YaHei', size: 9.5, color: { argb: 'FF475569' } };
+        metaCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF1F5F9' } };
+        metaCell.alignment = { vertical: 'middle', horizontal: 'center' };
+        metaCell.border = borderThin;
+        ws.getRow(2).height = 22;
+
+        // Row 3: Table Header
+        const thA = ws.getCell('A3');
+        thA.value = colItemName;
+        thA.font = { name: 'Microsoft YaHei', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        thA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+        thA.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        thA.border = borderThin;
+
+        const thB = ws.getCell('B3');
+        thB.value = colValName;
+        thB.font = { name: 'Microsoft YaHei', size: 11, bold: true, color: { argb: 'FFFFFFFF' } };
+        thB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+        thB.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+        thB.border = borderThin;
+        ws.getRow(3).height = 26;
+
+        // Data Rows
+        selectedRows.forEach((row, idx) => {
+            const rowNum = 4 + idx;
+            const cellA = ws.getCell(`A${rowNum}`);
+            const cellB = ws.getCell(`B${rowNum}`);
+
+            cellA.value = row.label;
+            cellA.font = { name: 'Microsoft YaHei', size: 10, bold: row.highlight, color: { argb: 'FF334155' } };
+            cellA.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFF8FAFC' } };
+            cellA.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            cellA.border = borderThin;
+
+            cellB.value = row.value;
+            if (row.highlight) {
+                cellB.font = { name: 'Microsoft YaHei', size: 10, bold: true, color: { argb: 'FF7C5200' } };
+                cellB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFF3CD' } };
+            } else {
+                cellB.font = { name: 'Microsoft YaHei', size: 10, color: { argb: 'FF0F172A' } };
+                cellB.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFFFFFFF' } };
+            }
+            cellB.alignment = { vertical: 'middle', horizontal: 'left', indent: 1 };
+            cellB.border = borderThin;
+
+            ws.getRow(rowNum).height = 23;
+        });
+
+        // Column widths
+        ws.getColumn(1).width = 38;
+        ws.getColumn(2).width = 50;
+
+        const buffer = await wb.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        triggerBlobDownload(blob, filename);
+    } else if (window.XLSX) {
+        const now = new Date();
+        const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
+        const sheetData = [
+            [title || (isEn ? 'Ni-Zn Battery System Configuration Solution' : '锌镍电池系统配置方案'), ''],
+            [`${subTitle ? subTitle + ' | ' : ''}${dateLabel}${dateStr}`, ''],
+            [colItemName, colValName],
+            ...selectedRows.map(r => [r.label, r.value])
+        ];
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.aoa_to_sheet(sheetData);
+        XLSX.utils.book_append_sheet(wb, ws, sheetName);
+        XLSX.writeFile(wb, filename);
+    } else {
+        throw new Error(isEn ? 'Excel export library not loaded' : '未加载 Excel 导出组件');
+    }
+}
+
+async function exportToPdf(previewEl, filename) {
+    if (!previewEl) throw new Error((typeof currentLang !== 'undefined' && currentLang === 'en') ? 'Preview content not found' : '未找到预览内容');
+
+    if (window.html2canvas && window.jspdf) {
+        const { jsPDF } = window.jspdf;
+        const canvas = await window.html2canvas(previewEl, {
+            scale: 2,
+            useCORS: true,
+            backgroundColor: '#ffffff',
+            logging: false
+        });
+
+        const imgData = canvas.toDataURL('image/jpeg', 0.98);
+        const pdf = new jsPDF({
+            orientation: 'portrait',
+            unit: 'mm',
+            format: 'a4'
+        });
+
+        const pageWidth = pdf.internal.pageSize.getWidth();
+        const pageHeight = pdf.internal.pageSize.getHeight();
+        const margin = 12;
+        const maxContentWidth = pageWidth - margin * 2;
+        const imgWidth = maxContentWidth;
+        const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+        if (imgHeight <= pageHeight - margin * 2) {
+            pdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight);
+        } else {
+            let heightLeft = imgHeight;
+            let position = margin;
+            const availableHeight = pageHeight - margin * 2;
+
+            pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+            heightLeft -= availableHeight;
+
+            while (heightLeft > 0) {
+                position = position - availableHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight);
+                heightLeft -= availableHeight;
+            }
+        }
+
+        pdf.save(filename);
+    } else {
+        printExportTable();
+    }
+}
+
+function exportToHtml(title, subTitle, selectedRows, filename, targetLang) {
+    const lang = targetLang || exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
+    const isEn = (lang === 'en');
+    const previewEl = document.getElementById('exportPreviewPaper');
+    const contentHtml = previewEl ? previewEl.innerHTML : '';
+    const fullHtml = `<!DOCTYPE html>
+<html lang="${isEn ? 'en' : 'zh-CN'}"><head><meta charset="UTF-8">
+<title>${title} — ${subTitle}</title>
 <style>
-  body { font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif; background:#f0f2f5; display:flex; justify-content:center; padding:40px 20px; }
-  .wrapper { background:#fff; border-radius:10px; box-shadow:0 2px 16px rgba(0,0,0,0.10); overflow:hidden; max-width:600px; width:100%; }
+  body { font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif; background:#f0f2f5; display:flex; justify-content:center; padding:40px 20px; margin:0; }
+  .wrapper { background:#fff; border-radius:10px; box-shadow:0 2px 16px rgba(0,0,0,0.10); overflow:hidden; max-width:640px; width:100%; }
   table { border-collapse:collapse; width:100%; }
-  .header-row th { background:#1d4ed8; color:#fff; font-size:14px; font-weight:700; padding:13px 16px; text-align:left; border:1px solid #1d4ed8; }
   @media print { body { background:white; padding:0; } .wrapper { box-shadow:none; } }
 </style>
-</head><body><div class="wrapper"><table>
-<thead><tr class="header-row"><th>项目</th><th>${upsLabel}</th></tr></thead>
-<tbody>${rowsHtml}</tbody>
-</table></div></body></html>`;
-    const blob = new Blob([tableHtml], { type: 'text/html;charset=utf-8' });
+</head><body><div class="wrapper">${contentHtml}</div></body></html>`;
+
+    const blob = new Blob([fullHtml], { type: 'text/html;charset=utf-8' });
+    triggerBlobDownload(blob, filename);
+}
+
+function triggerBlobDownload(blob, filename) {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    const ts = new Date().toISOString().slice(0,16).replace('T','_').replace(':','-');
-    a.download = '电池配置方案_' + inputs.batteryModelId + '_' + ts + '.html';
+    a.download = filename;
     document.body.appendChild(a);
     a.click();
     setTimeout(() => { URL.revokeObjectURL(url); document.body.removeChild(a); }, 1000);
 }
-document.getElementById('exportTableBtn').addEventListener('click', exportConfigTable);
 
+function printExportTable() {
+    const previewEl = document.getElementById('exportPreviewPaper');
+    if (!previewEl) return;
+    const printFrame = document.createElement('iframe');
+    printFrame.style.position = 'fixed';
+    printFrame.style.right = '0';
+    printFrame.style.bottom = '0';
+    printFrame.style.width = '0';
+    printFrame.style.height = '0';
+    printFrame.style.border = '0';
+    document.body.appendChild(printFrame);
 
-// ══════════════════════════════════════════════════════════════════
+    const doc = printFrame.contentWindow.document;
+    doc.open();
+    doc.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${exportModalState.title || '电池配置方案'}</title>
+<style>
+  @page { size: A4 portrait; margin: 12mm; }
+  body { font-family: 'Microsoft YaHei', 'PingFang SC', Arial, sans-serif; margin:0; padding:0; background:white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .export-preview-sheet { width:100% !important; max-width:100% !important; box-shadow:none !important; border:none !important; }
+  table { border-collapse:collapse; width:100%; }
+</style>
+</head><body>${previewEl.outerHTML}</body></html>`);
+    doc.close();
+
+    setTimeout(() => {
+        printFrame.contentWindow.focus();
+        printFrame.contentWindow.print();
+        setTimeout(() => {
+            if (document.body.contains(printFrame)) document.body.removeChild(printFrame);
+        }, 2000);
+    }, 400);
+}
+
+// 导出模态框事件监听绑定
+document.getElementById('exportTableBtn').addEventListener('click', openExportModal);
+document.getElementById('exportModalCloseBtn').addEventListener('click', closeExportModal);
+document.getElementById('exportModal').addEventListener('click', (e) => {
+    if (e.target.id === 'exportModal') closeExportModal();
+});
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        const modal = document.getElementById('exportModal');
+        if (modal && modal.style.display !== 'none') closeExportModal();
+    }
+});
+
+document.getElementById('exportSelectAllBtn').addEventListener('click', () => {
+    exportModalState.selectedIds = new Set(exportModalState.allRows.map(r => r.id));
+    renderExportChecklist();
+    renderExportPreview();
+});
+
+document.getElementById('exportBriefBtn').addEventListener('click', () => {
+    exportModalState.selectedIds = new Set(exportModalState.allRows.filter(r => BRIEF_EXPORT_PARAM_IDS.has(r.id)).map(r => r.id));
+    renderExportChecklist();
+    renderExportPreview();
+});
+
+document.getElementById('exportInvertBtn').addEventListener('click', () => {
+    const newSet = new Set();
+    exportModalState.allRows.forEach(r => {
+        if (!exportModalState.selectedIds.has(r.id)) newSet.add(r.id);
+    });
+    exportModalState.selectedIds = newSet;
+    renderExportChecklist();
+    renderExportPreview();
+});
+
+document.getElementById('exportClearBtn').addEventListener('click', () => {
+    exportModalState.selectedIds.clear();
+    renderExportChecklist();
+    renderExportPreview();
+});
+
+document.getElementById('exportKeyOnlyBtn').addEventListener('click', () => {
+    exportModalState.selectedIds = new Set(exportModalState.allRows.filter(r => r.highlight).map(r => r.id));
+    renderExportChecklist();
+    renderExportPreview();
+});
+
+document.getElementById('exportParamFilterInput').addEventListener('input', (e) => {
+    exportModalState.filterText = e.target.value;
+    renderExportChecklist();
+});
+
+document.querySelectorAll('input[name="exportFormatRadio"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        exportModalState.format = e.target.value;
+        const btnText = document.getElementById('exportDownloadBtnText');
+        const isEn = (exportModalState.exportLang === 'en');
+        if (btnText) {
+            if (e.target.value === 'xlsx') btnText.textContent = isEn ? 'Download Excel (.xlsx)' : '下载 Excel 表格 (.xlsx)';
+            else if (e.target.value === 'pdf') btnText.textContent = isEn ? 'Download PDF (.pdf)' : '下载 PDF 文档 (.pdf)';
+            else btnText.textContent = isEn ? 'Download HTML (.html)' : '下载 HTML 网页 (.html)';
+        }
+    });
+});
+
+document.querySelectorAll('input[name="exportLangRadio"]').forEach(radio => {
+    radio.addEventListener('change', (e) => {
+        exportModalState.exportLang = e.target.value;
+        const data = getExportDataset(exportModalState.exportLang);
+        if (data) {
+            exportModalState.title = data.title;
+            exportModalState.subTitle = data.subTitle;
+            exportModalState.upsLabel = data.upsLabel;
+            exportModalState.allRows = data.rows;
+            exportModalState.inputs = data.inputs;
+            exportModalState.r = data.r;
+            exportModalState.dc = data.dc;
+            renderExportChecklist();
+            renderExportPreview();
+            updateExportModalStaticTexts(exportModalState.exportLang);
+        }
+    });
+});
+
+document.getElementById('exportDownloadBtn').addEventListener('click', downloadExportFile);
+document.getElementById('exportPrintBtn').addEventListener('click', printExportTable);
+
 // MAIN RECALCULATE
 // ══════════════════════════════════════════════════════════════════
 function recalculate() {
@@ -2571,11 +3501,11 @@ function recalculate() {
             // 工况表模式：功率来自工况表峰值段，与 UPS 额定容量无关，不能套用「UPS 额定 kVA × …」的文案
             if (reqInput && document.activeElement !== reqInput) reqInput.value = (r.totalRequiredPower / 1000).toFixed(2);
             if (reqHint) reqHint.textContent = '工况表峰值段 ' + fmt(acDutySummary.peakKva, 2) + ' kVA × PF ' + inputs.powerFactor
-                + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' × 老化 ' + inputs.agingFactor + ' × 余量 ' + inputs.designMargin
+                + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' ' + formatFactorText('老化', inputs.agingFactor) + ' ' + formatFactorText('余量', inputs.designMargin)
                 + ' = ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW（定容按 IEEE 485 分段法，不用此峰值×全程）';
         } else if (requiredPowerMode === 'auto') {
             if (reqInput && document.activeElement !== reqInput) reqInput.value = (r.totalRequiredPower / 1000).toFixed(2);
-            if (reqHint) reqHint.textContent = 'UPS ' + fmt(inputs.upsRatingKva, 0) + 'kVA × PF ' + inputs.powerFactor + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' × 老化 ' + inputs.agingFactor + ' × 余量 ' + inputs.designMargin + ' = ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW';
+            if (reqHint) reqHint.textContent = 'UPS ' + fmt(inputs.upsRatingKva, 0) + 'kVA × PF ' + inputs.powerFactor + ' ÷ 逆变 ' + inputs.inverterEfficiency + ' ' + formatFactorText('老化', inputs.agingFactor) + ' ' + formatFactorText('余量', inputs.designMargin) + ' = ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW';
         } else {
             const diffKw = (r.totalRequiredPower - r.autoRequiredPower) / 1000;
             if (reqHint) reqHint.innerHTML = '手动指定；自动计算值 ' + fmt(r.autoRequiredPower / 1000, 2) + ' kW（差 ' + (diffKw >= 0 ? '+' : '') + fmt(diffKw, 2) + ' kW）';
@@ -2646,27 +3576,32 @@ function recalculate() {
         // ── Config Details ──
         const cd = document.getElementById('configDetails');
         if (cd) {
+            const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
             cd.innerHTML = [
-                detailRow('查表 EPV 档位', r.matchedEpvKey + ' V'),
-                detailRow('查表时间点', r.matchedTime + ' min'),
-                detailRow(r.isDuty ? 'IEEE 485 控制段' : '定容依据',
+                detailRow(isEn ? 'Lookup EPV Level' : '查表 EPV 档位', r.matchedEpvKey + ' V'),
+                detailRow(isEn ? 'Lookup Time Point' : '查表时间点', r.matchedTime + ' min'),
+                detailRow(r.isDuty ? (isEn ? 'IEEE 485 Control Section' : 'IEEE 485 控制段') : (isEn ? 'Sizing Basis' : '定容依据'),
                     r.isDuty
-                        ? ('Section ' + r.dutySection.section + '（累计 ' + fmt(r.dutySection.sectionMinutes, 0) + ' min）')
-                        : '恒定负荷 ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW'),
-                detailRow('所需电芯当量 / 实配', fmt(r.requiredCells, 1) + ' → 实配 ' + r.totalCells + ' 节（最少 ' + r.recommendedStrings + ' 组）'),
-                detailRow('单组电池块数', r.blocksPerGroup + ' blocks (节数 = ' + (r.blocksPerGroup * 8) + ')'),
-                detailRow('配置总功率', fmt(r.totalProposedPower) + ' W'),
-                (calcMode === 'power' && !r.isDuty) ? detailRow('能量校核（查表可用 / 需求）',
+                        ? (isEn ? ('Section ' + r.dutySection.section + ' (Cumulative ' + fmt(r.dutySection.sectionMinutes, 0) + ' min)') : ('Section ' + r.dutySection.section + '（累计 ' + fmt(r.dutySection.sectionMinutes, 0) + ' min）'))
+                        : (isEn ? ('Constant Load ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW') : ('恒定负荷 ' + fmt(r.totalRequiredPower / 1000, 2) + ' kW'))),
+                detailRow(isEn ? 'Required Equivalent Cells / Actual' : '所需电芯当量 / 实配',
+                    isEn ? (fmt(r.requiredCells, 1) + ' → Actual ' + r.totalCells + ' cells (Min ' + r.recommendedStrings + ' strings)') : (fmt(r.requiredCells, 1) + ' → 实配 ' + r.totalCells + ' 节（最少 ' + r.recommendedStrings + ' 组）')),
+                detailRow(isEn ? 'Blocks per String' : '单组电池块数',
+                    isEn ? (r.blocksPerGroup + ' blocks (Cells = ' + (r.blocksPerGroup * 8) + ')') : (r.blocksPerGroup + ' blocks (节数 = ' + (r.blocksPerGroup * 8) + ')')),
+                detailRow(isEn ? 'Total Proposed Power' : '配置总功率', fmt(r.totalProposedPower) + ' W'),
+                (calcMode === 'power' && !r.isDuty) ? detailRow(isEn ? 'Energy Audit (Available / Required)' : '能量校核（查表可用 / 需求）',
                     fmt(r.providedEnergyWh / 1000, 2) + ' / ' + fmt(r.requiredEnergyWh / 1000, 2)
-                    + ' kWh（' + (r.energySatisfactionRatio * 100).toFixed(1) + '%）') : '',
-                detailRow('配置标称电压 (13.2V×块数)', fmt(r.configNominalVoltage, 1) + ' V'),
-                detailRow('配置浮充电压 (TCV/cell−0.05)×节数', fmt(r.configFloatVoltage, 1) + ' V'),
-                detailRow('单电池尺寸 (L×W×H)', r.unitLength + ' × ' + r.unitWidth + ' × ' + r.unitHeight + ' m'),
-                detailRow('电池总体积', fmt(r.totalVolume, 4) + ' m³'),
-                detailRow('电池总数量', r.unitsPerString + ' × ' + inputs.numberOfStrings + ' = ' + r.totalQuantity + ' blocks'),
-                detailRow('电池总重量 Total Weight', fmt(r.totalWeight, 1) + ' kg'),
-                detailRow('系统总能量 Total Energy', fmt(r.totalEnergyKWh, 2) + ' kWh'),
-                detailRow('温度补偿电压 TCV', fmt(r.temperatureCoefficient, 4) + ' V/cell（' + fmt(r.temperatureCoefficient * 8, 4) + ' V/块） @' + inputs.temperature + '℃')
+                    + ' kWh (' + (r.energySatisfactionRatio * 100).toFixed(1) + '%)') : '',
+                detailRow(isEn ? 'Nominal Voltage (13.2V × blocks)' : '配置标称电压 (13.2V×块数)', fmt(r.configNominalVoltage, 1) + ' V'),
+                detailRow(isEn ? 'Float Voltage (TCV/cell−0.05) × cells' : '配置浮充电压 (TCV/cell−0.05)×节数', fmt(r.configFloatVoltage, 1) + ' V'),
+                detailRow(isEn ? 'Unit Dimensions (L×W×H)' : '单电池尺寸 (L×W×H)', r.unitLength + ' × ' + r.unitWidth + ' × ' + r.unitHeight + ' m'),
+                detailRow(isEn ? 'Total Battery Volume' : '电池总体积', fmt(r.totalVolume, 4) + ' m³'),
+                detailRow(isEn ? 'Total Battery Quantity' : '电池总数量', r.unitsPerString + ' × ' + inputs.numberOfStrings + ' = ' + r.totalQuantity + ' blocks'),
+                detailRow(isEn ? 'Total Battery Net Weight' : '电池总重量 Total Weight', fmt(r.totalWeight, 1) + ' kg'),
+                detailRow(isEn ? 'Total System Energy' : '系统总能量 Total Energy', fmt(r.totalEnergyKWh, 2) + ' kWh'),
+                detailRow(isEn ? 'Temp Compensated Voltage TCV' : '温度补偿电压 TCV',
+                    isEn ? (fmt(r.temperatureCoefficient, 4) + ' V/cell (' + fmt(r.temperatureCoefficient * 8, 4) + ' V/block) @' + inputs.temperature + '℃')
+                         : (fmt(r.temperatureCoefficient, 4) + ' V/cell（' + fmt(r.temperatureCoefficient * 8, 4) + ' V/块） @' + inputs.temperature + '℃'))
             ].join('');
         }
 
@@ -2727,14 +3662,14 @@ function calculateCapacity(inputs) {
     if (!model) throw new Error('Unknown model');
     const { specs } = model;
 
-    // Step 1: total required battery power（老化系数用乘法，见 calculate 内同名修正）
+    // Step 1: total required battery power（>=1 乘法，<1 除法）
     let totalRequiredPower =
         (inputs.requiredPowerMode === 'manual' && inputs.manualRequiredPower > 0)
             ? inputs.manualRequiredPower
             : (inputs.upsRatingKva * 1000 * inputs.powerFactor)
               / inputs.inverterEfficiency
-              * (inputs.agingFactor  || 1)
-              * (inputs.designMargin || 1);
+              * getFactorMultiplier(inputs.agingFactor)
+              * getFactorMultiplier(inputs.designMargin);
 
     // Step 2: total energy required
     const backupTimeH   = inputs.backupTimeMin / 60;
@@ -2843,7 +3778,7 @@ function renderCapacityPanel(inputs, cr) {
     const statReqWh  = document.getElementById('statRequiredEnergy');
     if (statReqWh) statReqWh.innerHTML = fmt(cr.requiredWh, 0) + '<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Wh</span>';
 
-    const autoWh = (inputs.upsRatingKva * 1000 * inputs.powerFactor / inputs.inverterEfficiency * (inputs.agingFactor || 1) * (inputs.designMargin || 1)) * (inputs.backupTimeMin / 60);
+    const autoWh = (inputs.upsRatingKva * 1000 * inputs.powerFactor / inputs.inverterEfficiency * getFactorMultiplier(inputs.agingFactor) * getFactorMultiplier(inputs.designMargin)) * (inputs.backupTimeMin / 60);
     lastAutoRequiredEnergy = autoWh;
 
     if (inputs.dutySteps && inputs.dutySteps.length) {
@@ -2876,7 +3811,7 @@ function renderCapacityPanel(inputs, cr) {
     const providedWh = (cr.whPerCell || 0) * (cr.totalCells || 0);
     const statProvWh = document.getElementById('statProvidedEnergy');
     if (statProvWh) statProvWh.innerHTML = fmt(providedWh, 0) + '<span class="stat-unit ml-1.5" style="color:rgb(var(--c-ok))">Wh</span>';
-    const hintProvWh = document.getElementById('hintProvidedEnergy');
+    const hintProvWh = document.getElementById('hintProvWh');
     if (hintProvWh) {
         hintProvWh.textContent = fmt(cr.wattPerCell, 1) + ' W/cell(@' + cr.matchedTime + 'min) × '
             + fmt(cr.backupTimeH, 2) + 'h × ' + cr.totalCells + '节 = ' + fmt(providedWh, 0)
@@ -2910,7 +3845,7 @@ function renderCapacityPanel(inputs, cr) {
         if (requiredEnergyMode === 'manual') {
             hintCapPower.textContent = fmt(cr.requiredWh, 0) + ' Wh ÷ ' + fmt(inputs.backupTimeMin / 60, 2) + ' h = ' + fmt(cr.totalRequiredPower / 1000, 2) + ' kW (' + fmt(cr.totalRequiredPower, 0) + ' W)';
         } else {
-            hintCapPower.textContent = fmt(inputs.upsRatingKva, 0) + ' kVA × ' + inputs.powerFactor + ' ÷ ' + inputs.inverterEfficiency + ' × 老化 ' + (inputs.agingFactor || 1) + ' × 余量 ' + (inputs.designMargin || 1) + ' = ' + fmt(cr.totalRequiredPower / 1000, 2) + ' kW (' + fmt(cr.totalRequiredPower, 0) + ' W)';
+            hintCapPower.textContent = fmt(inputs.upsRatingKva, 0) + ' kVA × ' + inputs.powerFactor + ' ÷ ' + inputs.inverterEfficiency + ' ' + formatFactorText('老化', inputs.agingFactor) + ' ' + formatFactorText('余量', inputs.designMargin) + ' = ' + fmt(cr.totalRequiredPower / 1000, 2) + ' kW (' + fmt(cr.totalRequiredPower, 0) + ' W)';
         }
     }
 
@@ -3144,7 +4079,7 @@ function getRecommendedAcConfig(inputs, mode) {
         reqWh = dutySummary.batteryWh;
         reqPowerW = dutySummary.peakBatteryW;
     } else {
-        reqPowerW = (inputs.upsRatingKva * 1000 * opt.powerFactor) / opt.inverterEfficiency * opt.agingFactor * opt.designMargin;
+        reqPowerW = (inputs.upsRatingKva * 1000 * opt.powerFactor) / opt.inverterEfficiency * getFactorMultiplier(opt.agingFactor) * getFactorMultiplier(opt.designMargin);
         reqWh = reqPowerW * (targetTimeMin / 60);
     }
 
@@ -3629,9 +4564,9 @@ function calculateDc(inputs) {
     let continuousCurrentA = 0;
     let dutyDetails = [];
 
-    const af = inputs.agingFactor || 1;
-    const dm = inputs.designMargin || 1;
-    const loadMargin = af * dm;
+    const afMult = getFactorMultiplier(inputs.agingFactor);
+    const dmMult = getFactorMultiplier(inputs.designMargin);
+    const loadMargin = afMult * dmMult;
 
     if (dcLoadMode === 'duty') {
         dutyDetails = dcDutyCycleList.map((step, idx) => {
@@ -3782,7 +4717,12 @@ function renderDcPanel(inputs, d) {
     const statDcDemand = document.getElementById('statDcDemand');
     if (statDcDemand) statDcDemand.innerHTML = `${fmt(d.adjustedContCurrentA, 1)}<span class="stat-unit ml-1.5">A</span>`;
     const hintDcDemand = document.getElementById('hintDcDemand');
-    if (hintDcDemand) hintDcDemand.textContent = `持续 ${fmt(d.continuousCurrentA, 1)}A × 余量 ${((inputs.agingFactor||1)*(inputs.designMargin||1)).toFixed(2)} | 峰值冲击: ${fmt(d.adjustedPeakCurrentA, 1)}A`;
+    if (hintDcDemand) {
+        const factorDesc = (inputs.agingFactor < 1 || inputs.designMargin < 1)
+            ? `${formatFactorText('老化', inputs.agingFactor)} ${formatFactorText('余量', inputs.designMargin)} (综合系数 ${(loadMargin).toFixed(2)})`
+            : `× 余量 ${(loadMargin).toFixed(2)}`;
+        hintDcDemand.textContent = `持续 ${fmt(d.continuousCurrentA, 1)}A ${factorDesc} | 峰值冲击: ${fmt(d.adjustedPeakCurrentA, 1)}A`;
+    }
 
     const statDcCellCapability = document.getElementById('statDcCellCapability');
     if (statDcCellCapability) statDcCellCapability.innerHTML = `${fmt(d.cellDischargeA, 1)}<span class="stat-unit ml-1.5">A/cell</span>`;
@@ -3893,7 +4833,7 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
             ).join('<br>') : '';
             el.innerHTML = [
                 powerStep('Step 1', '交流视在功率 → 电池侧功率',
-                    `每阶段 kVA × ${pf}(PF) ÷ ${eff}(逆变效率) × ${af}(老化) × ${dm}(余量)`,
+                    `每阶段 kVA × ${pf}(PF) ÷ ${eff}(逆变效率) ${formatFactorText('老化', af)} ${formatFactorText('余量', dm)}`,
                     `${dutyStagesText}`),
                 powerStep('Step 2', '工况累计电量（= 电池侧所需能量）',
                     `总时长 ${acDutySummary.totalMin} min (${(acDutySummary.totalMin / 60).toFixed(2)}h) · 交流侧 ${fmt(acDutySummary.acLoadWh / 1000, 2)} kWh`,
@@ -3917,7 +4857,7 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
             const isManualPw = inputs.requiredPowerMode === 'manual';
             const step1Formula = isManualPw
                 ? `手动指定电池总功率需求: ${(np / 1000).toFixed(2)} kW`
-                : `${kva} kVA × ${pf} ÷ ${eff}(逆变效率) × ${af}(老化) × ${dm}(余量)`;
+                : `${kva} kVA × ${pf} ÷ ${eff}(逆变效率) ${formatFactorText('老化', af)} ${formatFactorText('余量', dm)}`;
             el.innerHTML = [
                 powerStep('Step 1', '计算电池组总功率需求',
                     step1Formula,
@@ -3982,7 +4922,7 @@ function renderCalcSteps(inputs, r, cr, dcResult, acDutySummary) {
             const isManualE = inputs.requiredEnergyMode === 'manual';
             const step1Formula = isManualE
                 ? `手动指定总能量反推功率: ${fmt(rWh, 0)} Wh ÷ ${bth.toFixed(4)} h`
-                : `${inputs.upsRatingKva}kVA × ${inputs.powerFactor} ÷ ${inputs.inverterEfficiency} × ${inputs.agingFactor || 1} × ${inputs.designMargin || 1}`;
+                : `${inputs.upsRatingKva}kVA × ${inputs.powerFactor} ÷ ${inputs.inverterEfficiency} ${formatFactorText('老化', inputs.agingFactor)} ${formatFactorText('余量', inputs.designMargin)}`;
             const step2Formula = isManualE
                 ? `手动指定需求总能量`
                 : `${fmt(cr.totalRequiredPower, 1)} W × ${bth.toFixed(4)} h (${inputs.backupTimeMin}min)`;
@@ -4106,13 +5046,16 @@ function updateModeRecommend() {
     const el = document.getElementById('modeRecommend');
     const tip = document.getElementById('modeTooltip');
     if (!el) return;
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
     if (calcMode === 'dc') {
-        el.textContent = '🔌 直流UPS模式 (IEEE 485 阶梯/恒流)';
+        el.textContent = isEn ? '🔌 DC UPS Mode (IEEE 485 / CC)' : '🔌 直流UPS模式 (IEEE 485 阶梯/恒流)';
         el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help';
         el.style.background = 'rgb(var(--c-dc)/0.15)';
         el.style.color = 'rgb(var(--c-dc))';
         el.style.border = '1px solid rgb(var(--c-dc)/0.3)';
-        if (tip) tip.innerHTML = '<b>直流UPS模式 (变电站/直流屏)</b><br>基于母线电压窗口约束与规格书恒流放电数据，核算阶梯脉冲倍率与容量满足率。';
+        if (tip) tip.innerHTML = isEn
+            ? '<b>DC UPS Mode (Substation / DC Screen)</b><br>Verifies duty pulse C-rate and capacity satisfaction based on bus voltage window and constant current discharge data.'
+            : '<b>直流UPS模式 (变电站/直流屏)</b><br>基于母线电压窗口约束与规格书恒流放电数据，核算阶梯脉冲倍率与容量满足率。';
         return;
     }
     el.style.background = '';
@@ -4120,17 +5063,23 @@ function updateModeRecommend() {
     el.style.border = '';
     const t = backupTimeMin;
     if (t <= 15) {
-        el.textContent = '⚡ 推荐：功率验证模式';
+        el.textContent = isEn ? '⚡ Recommended: Power Mode' : '⚡ 推荐：功率验证模式';
         el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help badge badge-acc';
-        if (tip) tip.innerHTML = '<b>为什么选功率模式？</b><br>备电≤15min 放电电流大，须查恒功率表确认实际可输出功率 ≥ 需求功率。';
+        if (tip) tip.innerHTML = isEn
+            ? '<b>Why Power Mode?</b><br>Discharge current is high for backup ≤15 min. Constant power table verification is required.'
+            : '<b>为什么选功率模式？</b><br>备电≤15min 放电电流大，须查恒功率表确认实际可输出功率 ≥ 需求功率。';
     } else if (t <= 29) {
-        el.textContent = '⚠️ 过渡区：两种模式均可';
+        el.textContent = isEn ? '⚠️ Transition Zone: Either Mode' : '⚠️ 过渡区：两种模式均可';
         el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help badge badge-warn';
-        if (tip) tip.innerHTML = '<b>15～30 min 过渡区</b><br>功率与能量验证结果相近，建议两种模式对照确认。';
+        if (tip) tip.innerHTML = isEn
+            ? '<b>15–30 min Transition Zone</b><br>Both power and energy sizing give similar results. Cross-verification is recommended.'
+            : '<b>15～30 min 过渡区</b><br>功率与能量验证结果相近，建议两种模式对照确认。';
     } else {
-        el.textContent = '🔋 推荐：能量验证模式';
+        el.textContent = isEn ? '🔋 Recommended: Energy Mode' : '🔋 推荐：能量验证模式';
         el.className = 'rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help badge badge-ok';
-        if (tip) tip.innerHTML = '<b>为什么选能量模式？</b><br>备电≥30min 放电电流小，按能量 (Wh) 校核更直接，Ah 视图仅供与铅酸方案对比。';
+        if (tip) tip.innerHTML = isEn
+            ? '<b>Why Energy Mode?</b><br>Discharge current is lower for backup ≥30 min. Energy (Wh) sizing is more direct and accurate.'
+            : '<b>为什么选能量模式？</b><br>备电≥30min 放电电流小，按能量 (Wh) 校核更直接，Ah 视图仅供与铅酸方案对比。';
     }
 }
 
@@ -4335,6 +5284,494 @@ document.getElementById('savedConfigsList').addEventListener('click', function (
 
 <script>
 /* ══════════════════════════════════════════════════════════════════
+   I18N SYSTEM — 国际化语言切换（中/英文双语，localStorage 记忆）
+   ══════════════════════════════════════════════════════════════════ */
+const LANG_KEY = 'nizn_lang_v1';
+let currentLang = 'zh';
+try { currentLang = localStorage.getItem(LANG_KEY) || 'zh'; } catch (e) {}
+
+const I18N = {
+    zh: {
+        app_title: 'Jayden的智能配置计算引擎',
+        app_subtitle: 'Sizing Calculator — 基于手动配置的实时校验与满足率测算',
+        ai_toggle: 'AI 辅助分析',
+        tab_power: '<span>⚡</span> 功率验证模式',
+        tab_capacity: '<span>🔋</span> 能量验证模式',
+        tab_dc_ups: '<span>🔌</span> 直流UPS模式',
+        sec_battery_sys: '电池型号与系统参数',
+        btn_save_config: '保存配置',
+        lbl_battery_model: 'Battery Model 电池型号',
+        lbl_ups_kva: 'UPS 容量 (kVA)',
+        lbl_sys_volt: '系统工作电压 (Vdc)',
+        hint_sys_volt: '可由右侧电压范围反算: (下限+上限)/2 或按 ± 百分值反推',
+        lbl_pf: '功率因数 (PF)',
+        lbl_eff: '逆变器效率',
+        lbl_ac_load_mode: '交流负载模式 (AC Load)',
+        btn_const_load: '恒定负荷',
+        btn_duty_load: '阶梯负荷工况',
+        ac_duty_title: '多阶段工况设定 (Duty Cycle) · 单位 kVA（交流视在功率）',
+        btn_add_stage: '+ 添加阶段',
+        lbl_total_duration: '总时长:',
+        lbl_cum_energy: '累计电量(电池侧):',
+        lbl_peak: '峰值',
+        lbl_dc_bus_presets: '直流母线预设与工作窗口 (DC Bus)',
+        btn_dc_preset_110: '110V (电力标准)',
+        btn_dc_preset_125: '125V (工控)',
+        btn_dc_preset_220: '220V (高压直流)',
+        btn_dc_preset_48: '48V (通信)',
+        btn_dc_preset_custom: '自定义',
+        lbl_dc_nom_volt: '母线标称电压',
+        lbl_dc_chg_max: '充电上限 (Vmax)',
+        lbl_dc_dis_min: '放电下限 (Vmin)',
+        btn_apply_dc_recommend: '一键采用',
+        lbl_dc_load_conf: '直流负载工况配置 (DC Load)',
+        lbl_dc_load_val: '负荷大小',
+        lbl_dc_load_unit: '负荷单位',
+        opt_dc_unit_a: '电流 A (直流安培)',
+        opt_dc_unit_kw: '功率 kW (按 Vmin 折算)',
+        lbl_dc_const_time: '持续时长',
+        lbl_dc_duty_title: '多段瞬态/持续负荷组合',
+        btn_load_s2t: '载入附件S2T工况',
+        lbl_cum_ah: '累计耗电:',
+        sec_battery_topology: '电池组配置',
+        ac_rec_title: '💡 智能配置推荐',
+        ac_rec_badge: '一键达标',
+        ac_rec_apply_btn: '一键采纳推荐配置',
+        lbl_epv: '单节电芯截止电压 (EPV)',
+        hint_epv_block: '单节电池截止电压: EPV × 8 = ',
+        lbl_cells_string: '单组电芯总节数',
+        hint_cells_auto: '自动默认: ⌊系统电压 / 1.65⌋ = ',
+        hint_cells_link: ' 节 · 与块数联动 (节数 = 块数×8)',
+        lbl_num_strings: '配置的电池组数',
+        lbl_blocks_group: '单组电池块数',
+        hint_blocks_manual: '默认 ⌈节数 / 8⌉，可手动调节；手动改动将令节数 = 块数×8 并重算',
+        sec_advanced: '高级参数 Advanced',
+        lbl_design_margin: '设计余量',
+        hint_margin: '(≥1乘, <1除)',
+        lbl_aging_factor: '老化系数',
+        hint_aging: '(EOL 80% → 0.8 或 1.25)',
+        lbl_ambient_temp: '环境温度 (℃)',
+        sec_backup_time: '要求的备电时间',
+        lbl_current_sel: '当前选择: ',
+        sec_saved_configs: '已保存的配置 Saved Configurations',
+        hint_saved_configs: '点击任意配置可一键回填到计算器',
+        empty_saved_configs: '暂无保存的配置，点击“保存配置”开始',
+        sec_current_summary: '当前配置详细信息',
+        btn_copy_config: '一键复制',
+        btn_copied: '已复制 ✓',
+        btn_export_table: '导出表格',
+        hint_copy_config: '点击「一键复制」即可复制下方电池配置信息，直接发送给同事或客户。',
+        sec_calc_steps: '计算步骤详解',
+        voltage_panel_title: '电压匹配度仪表盘 Voltage Boundary',
+        lbl_ups_volt_range: 'UPS 逆变/整流电压范围',
+        hint_ups_range_edit: '提示: 直接编辑上方上/下限电压，将按 ± 百分值自动反算「系统工作电压」。',
+        lbl_batt_volt_range: '电池组电压范围',
+        lbl_dis_lower_vv: '放电下限 (EPV×节数)',
+        lbl_chg_upper_vv: '充电上限 (TCV/cell×节数)',
+        hero_sat_power: '功率满足率',
+        hero_sat_energy: '能量满足率',
+        hero_sat_dc: '直流工况满足率',
+        hero_runtime: '预估后备时间',
+        hero_runtime_dc: '总后备时间',
+        hero_weight: '系统总重',
+        hero_weight_dc: '锌镍系统总重',
+        hero_weight_sub_dc: '锌镍系统净重',
+        stat_req_power: '电池总功率需求',
+        stat_proposed_power: '配置可提供功率',
+        stat_cell_lookup_w: '查表单节功率',
+        stat_power_per_block: '单节电池可提供总功率',
+        stat_power_per_string: '单组可提供总功率',
+        stat_max_current: '电池最大放电电流',
+        stat_max_current_string: '单组最大电流',
+        stat_nominal_volt: '配置的电池标称电压',
+        stat_float_volt: '配置的电池浮充电压',
+        stat_req_energy: '需求总能量',
+        stat_provided_energy: '配置可提供能量',
+        stat_req_ah_block: '每块需求容量（参考）',
+        stat_prov_ah_block: '配置提供容量（每块，参考）',
+        stat_prov_total_ah: '配置提供总容量（参考）',
+        stat_string_volt: '串联电压',
+        stat_total_energy: '系统总能量',
+        stat_dc_demand: '持续负荷需求 (Current/Power)',
+        stat_dc_cell_cap: '查表单体放电电流 (EPV档位)',
+        stat_dc_avail_curr: '系统可用放电电流',
+        stat_dc_volt_window: '直流母线电压窗口与单体核算',
+        stat_dc_pulse: '峰值冲击倍率校核',
+        stat_dc_cum_ah: '工况累计电量 / 系统总容量',
+        sec_config_details: '配置详情 Configuration Details'
+    },
+    en: {
+        app_title: "Jayden's Intelligent Sizing Engine",
+        app_subtitle: 'Ni-Zn Battery Sizing Calculator — Real-time Verification & Satisfaction Estimation',
+        ai_toggle: 'AI Analysis',
+        tab_power: '<span>⚡</span> Power Mode',
+        tab_capacity: '<span>🔋</span> Energy Mode',
+        tab_dc_ups: '<span>🔌</span> DC UPS Mode',
+        sec_battery_sys: 'Battery Model & System Parameters',
+        btn_save_config: 'Save Config',
+        lbl_battery_model: 'Battery Model',
+        lbl_ups_kva: 'UPS Capacity (kVA)',
+        lbl_sys_volt: 'System Operating Voltage (Vdc)',
+        hint_sys_volt: 'Back-calculated from voltage range: (min+max)/2 or via ±% tolerance',
+        lbl_pf: 'Power Factor (PF)',
+        lbl_eff: 'Inverter Efficiency',
+        lbl_ac_load_mode: 'AC Load Profile',
+        btn_const_load: 'Constant Load',
+        btn_duty_load: 'Duty Cycle Profile',
+        ac_duty_title: 'Multi-stage Duty Cycle Profile · Unit: kVA (AC Apparent Power)',
+        btn_add_stage: '+ Add Stage',
+        lbl_total_duration: 'Total Duration:',
+        lbl_cum_energy: 'Cumulative Energy (Battery):',
+        lbl_peak: 'Peak',
+        lbl_dc_bus_presets: 'DC Bus Presets & Voltage Window',
+        btn_dc_preset_110: '110V (Utility)',
+        btn_dc_preset_125: '125V (Industrial)',
+        btn_dc_preset_220: '220V (HVDC)',
+        btn_dc_preset_48: '48V (Telecom)',
+        btn_dc_preset_custom: 'Custom',
+        lbl_dc_nom_volt: 'Nominal Bus Voltage',
+        lbl_dc_chg_max: 'Charge Max (Vmax)',
+        lbl_dc_dis_min: 'Discharge Min (Vmin)',
+        btn_apply_dc_recommend: 'Apply Recommendation',
+        lbl_dc_load_conf: 'DC Load Configuration',
+        lbl_dc_load_val: 'Load Value',
+        lbl_dc_load_unit: 'Load Unit',
+        opt_dc_unit_a: 'Current A (DC Amperes)',
+        opt_dc_unit_kw: 'Power kW (Converted at Vmin)',
+        lbl_dc_const_time: 'Duration',
+        lbl_dc_duty_title: 'Multi-stage Transient / Continuous Load Profile',
+        btn_load_s2t: 'Load S2T Profile',
+        lbl_cum_ah: 'Cumulative Ah:',
+        sec_battery_topology: 'Battery String Topology',
+        ac_rec_title: '💡 Smart Recommendation',
+        ac_rec_badge: 'Optimal Fit',
+        ac_rec_apply_btn: 'Apply Recommendation',
+        lbl_epv: 'End Point Voltage per Cell (EPV)',
+        hint_epv_block: 'Block Cutoff Voltage: EPV × 8 = ',
+        lbl_cells_string: 'Total Cells per String',
+        hint_cells_auto: 'Default: ⌊System Voltage / 1.65⌋ = ',
+        hint_cells_link: ' cells · Linked with blocks (Cells = Blocks × 8)',
+        lbl_num_strings: 'Number of Strings (Parallel)',
+        lbl_blocks_group: 'Battery Blocks per String',
+        hint_blocks_manual: 'Default ⌈Cells / 8⌉; manual change sets Cells = Blocks × 8 and recalculates',
+        sec_advanced: 'Advanced Parameters',
+        lbl_design_margin: 'Design Margin',
+        hint_margin: '(≥1 mul, <1 div)',
+        lbl_aging_factor: 'Aging Factor',
+        hint_aging: '(EOL 80% → 0.8 or 1.25)',
+        lbl_ambient_temp: 'Ambient Temp (℃)',
+        sec_backup_time: 'Required Backup Duration',
+        lbl_current_sel: 'Selected: ',
+        sec_saved_configs: 'Saved Configurations',
+        hint_saved_configs: 'Click any profile to reload into calculator',
+        empty_saved_configs: 'No saved configurations yet. Click "Save Config" above.',
+        sec_current_summary: 'Current Configuration Summary',
+        btn_copy_config: 'Copy Config',
+        btn_copied: 'Copied ✓',
+        btn_export_table: 'Export Table',
+        hint_copy_config: 'Click "Copy Config" to copy battery parameters below for sharing with clients or colleagues.',
+        sec_calc_steps: 'Calculation Steps Breakdown',
+        voltage_panel_title: 'Voltage Boundary Dashboard',
+        lbl_ups_volt_range: 'UPS Inverter / Rectifier Voltage Range',
+        hint_ups_range_edit: 'Tip: Directly edit voltage limits above to back-calculate system voltage via ±% range.',
+        lbl_batt_volt_range: 'Battery String Voltage Range',
+        lbl_dis_lower_vv: 'Discharge Lower Limit (EPV × Cells)',
+        lbl_chg_upper_vv: 'Charge Upper Limit (TCV/cell × Cells)',
+        hero_sat_power: 'Power Satisfaction',
+        hero_sat_energy: 'Energy Satisfaction',
+        hero_sat_dc: 'DC Duty Satisfaction',
+        hero_runtime: 'Estimated Runtime',
+        hero_runtime_dc: 'Total Backup Time',
+        hero_weight: 'Total Weight',
+        hero_weight_dc: 'Total Ni-Zn Weight',
+        hero_weight_sub_dc: 'Ni-Zn Net Weight',
+        stat_req_power: 'Total Battery Power Demand',
+        stat_proposed_power: 'Configured Available Power',
+        stat_cell_lookup_w: 'Lookup Power per Cell',
+        stat_power_per_block: 'Total Power per Block',
+        stat_power_per_string: 'Total Power per String',
+        stat_max_current: 'Max Discharge Current',
+        stat_max_current_string: 'Max Current per String',
+        stat_nominal_volt: 'Configured Nominal Voltage',
+        stat_float_volt: 'Configured Float Voltage',
+        stat_req_energy: 'Total Required Energy',
+        stat_provided_energy: 'Configured Available Energy',
+        stat_req_ah_block: 'Required Capacity per Block (Ref)',
+        stat_prov_ah_block: 'Provided Capacity per Block (Ref)',
+        stat_prov_total_ah: 'Total Provided Capacity (Ref)',
+        stat_string_volt: 'String Voltage',
+        stat_total_energy: 'Total System Energy',
+        stat_dc_demand: 'Continuous Load Demand (Current/Power)',
+        stat_dc_cell_cap: 'Lookup Cell Discharge Current (EPV)',
+        stat_dc_avail_curr: 'System Available Discharge Current',
+        stat_dc_volt_window: 'DC Bus Voltage Window Verification',
+        stat_dc_pulse: 'Peak Pulse C-Rate Verification',
+        stat_dc_cum_ah: 'Cumulative Load Ah / System Total Ah',
+        sec_config_details: 'Configuration Details'
+    }
+};
+
+function applyLanguage(lang) {
+    currentLang = (lang === 'en') ? 'en' : 'zh';
+    try { localStorage.setItem(LANG_KEY, currentLang); } catch (e) {}
+
+    const isEn = (currentLang === 'en');
+    document.documentElement.lang = isEn ? 'en' : 'zh-CN';
+    document.title = isEn
+        ? "Jayden's Intelligent Sizing Engine | Ni-Zn Battery Configuration Calculator"
+        : "Jayden的智能配置计算引擎 | Ni-Zn Battery Configuration Calculator";
+
+    const label = document.getElementById('langPickerLabel');
+    if (label) label.textContent = isEn ? 'English' : '中文';
+
+    document.querySelectorAll('#langMenu .theme-item').forEach(el => {
+        el.classList.toggle('current', el.dataset.langId === currentLang);
+    });
+    const tickZh = document.getElementById('langTickZh');
+    const tickEn = document.getElementById('langTickEn');
+    if (tickZh) tickZh.style.visibility = isEn ? 'hidden' : 'visible';
+    if (tickEn) tickEn.style.visibility = isEn ? 'visible' : 'hidden';
+
+    // Map DOM elements to i18n
+    const t = I18N[currentLang];
+    const setText = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
+    const setHtml = (id, htmlStr) => { const el = document.getElementById(id); if (el) el.innerHTML = htmlStr; };
+
+    // Header
+    const titleH2 = document.querySelector('#calcPane h2.text-lg');
+    if (titleH2) titleH2.textContent = t.app_title;
+    const titleSub = document.querySelector('#calcPane p.text-ink3');
+    if (titleSub && (titleSub.textContent.includes('Sizing Calculator') || titleSub.textContent.includes('Calculator'))) {
+        titleSub.textContent = t.app_subtitle;
+    }
+    const aiToggleSpan = document.querySelector('#aiToggleBtn span');
+    if (aiToggleSpan) aiToggleSpan.textContent = t.ai_toggle;
+
+    // Tabs
+    setHtml('tabPower', t.tab_power);
+    setHtml('tabCapacity', t.tab_capacity);
+    setHtml('tabDcUps', t.tab_dc_ups);
+
+    // Save button
+    const saveBtn = document.getElementById('saveConfigBtn');
+    if (saveBtn) saveBtn.innerHTML = `<i data-lucide="save" class="h-3.5 w-3.5"></i> ${t.btn_save_config}`;
+
+    // AC Inputs
+    const lblModel = document.querySelector('label[for="batteryModel"]');
+    if (lblModel) lblModel.textContent = t.lbl_battery_model;
+    const lblUps = document.querySelector('label[for="upsRatingKva"]');
+    if (lblUps) lblUps.textContent = t.lbl_ups_kva;
+    const lblSysVolt = document.querySelector('label[for="systemVoltage"]');
+    if (lblSysVolt) lblSysVolt.textContent = t.lbl_sys_volt;
+    const hintSysVolt = document.querySelector('#acParamsGrid p.hint');
+    if (hintSysVolt) hintSysVolt.textContent = t.hint_sys_volt;
+    const lblPf = document.querySelector('label[for="powerFactor"]');
+    if (lblPf) lblPf.textContent = t.lbl_pf;
+    const lblEff = document.querySelector('label[for="inverterEfficiency"]');
+    if (lblEff) lblEff.textContent = t.lbl_eff;
+    const lblAcLoad = document.querySelector('#acParamsGrid .border-t label.lbl');
+    if (lblAcLoad) lblAcLoad.textContent = t.lbl_ac_load_mode;
+
+    setText('acLoadModeConstBtn', isEn ? 'Constant Load' : '恒定负荷');
+    setText('acLoadModeDutyBtn', isEn ? 'Duty Cycle Profile' : '阶梯负荷工况');
+    const acDutyTitleSpan = document.querySelector('#acDutyCycleWrap span.text-\\[11px\\]');
+    if (acDutyTitleSpan) acDutyTitleSpan.textContent = t.ac_duty_title;
+    setText('addAcPeriodBtn', t.btn_add_stage);
+
+    // DC Inputs
+    const lblDcPresets = document.querySelector('#dcParamsGrid label.block');
+    if (lblDcPresets) lblDcPresets.textContent = t.lbl_dc_bus_presets;
+    const p110 = document.querySelector('#dcPresetButtons [data-preset="110"]');
+    if (p110) p110.textContent = t.btn_dc_preset_110;
+    const p125 = document.querySelector('#dcPresetButtons [data-preset="125"]');
+    if (p125) p125.textContent = t.btn_dc_preset_125;
+    const p220 = document.querySelector('#dcPresetButtons [data-preset="220"]');
+    if (p220) p220.textContent = t.btn_dc_preset_220;
+    const p48 = document.querySelector('#dcPresetButtons [data-preset="48"]');
+    if (p48) p48.textContent = t.btn_dc_preset_48;
+    const pCustom = document.querySelector('#dcPresetButtons [data-preset="custom"]');
+    if (pCustom) pCustom.textContent = t.btn_dc_preset_custom;
+
+    const lblDcNom = document.querySelector('label[for="dcSystemVoltage"]');
+    if (lblDcNom) lblDcNom.textContent = t.lbl_dc_nom_volt;
+    const lblDcMax = document.querySelector('label[for="dcVoltMax"]');
+    if (lblDcMax) lblDcMax.textContent = t.lbl_dc_chg_max;
+    const lblDcMin = document.querySelector('label[for="dcVoltMin"]');
+    if (lblDcMin) lblDcMin.textContent = t.lbl_dc_dis_min;
+    setText('applyDcBlocksBtn', t.btn_apply_dc_recommend);
+
+    const lblDcLoad = document.querySelector('#dcParamsGrid .border-t label.lbl');
+    if (lblDcLoad) lblDcLoad.textContent = t.lbl_dc_load_conf;
+    setText('dcLoadModeConstantBtn', isEn ? 'Constant Load' : '恒定负荷');
+    setText('dcLoadModeDutyBtn', isEn ? 'IEEE 485 Duty Cycle' : 'IEEE 485 阶梯工况');
+
+    const lblDcVal = document.querySelector('label[for="dcConstantLoadValue"]');
+    if (lblDcVal) lblDcVal.textContent = t.lbl_dc_load_val;
+    const lblDcUnit = document.querySelector('label[for="dcLoadUnitSelect"]');
+    if (lblDcUnit) lblDcUnit.textContent = t.lbl_dc_load_unit;
+    const optDcA = document.querySelector('#dcLoadUnitSelect option[value="A"]');
+    if (optDcA) optDcA.textContent = t.opt_dc_unit_a;
+    const optDcKw = document.querySelector('#dcLoadUnitSelect option[value="kW"]');
+    if (optDcKw) optDcKw.textContent = t.opt_dc_unit_kw;
+    const lblDcTime = document.querySelector('label[for="dcConstTimeMin"]');
+    if (lblDcTime) lblDcTime.textContent = t.lbl_dc_const_time;
+    setText('loadS2tPresetBtn', t.btn_load_s2t);
+    setText('addDcPeriodBtn', t.btn_add_stage);
+
+    // Battery Config Card
+    const battTopoH3 = document.querySelector('#calcPane .card:nth-of-type(2) h3') || document.querySelector('label[for="epv"]')?.closest('.card')?.querySelector('h3');
+    if (battTopoH3) battTopoH3.innerHTML = `<i data-lucide="activity" class="h-4 w-4 text-accent"></i> ${t.sec_battery_topology}`;
+
+    setText('acRecommendTitle', t.ac_rec_title);
+    setText('acRecommendBadge', t.ac_rec_badge);
+    setText('acApplyRecommendBtn', t.ac_rec_apply_btn);
+
+    const lblEpv = document.querySelector('label[for="epv"]');
+    if (lblEpv) lblEpv.textContent = t.lbl_epv;
+    const lblCells = document.querySelector('label[for="cellsPerString"]');
+    if (lblCells) lblCells.textContent = t.lbl_cells_string;
+    const lblStrings = document.querySelector('label[for="numberOfStrings"]');
+    if (lblStrings) lblStrings.textContent = t.lbl_num_strings;
+    const lblBlocks = document.querySelector('label[for="blocksPerGroupDisplay"]');
+    if (lblBlocks) lblBlocks.textContent = t.lbl_blocks_group;
+
+    // Advanced Card
+    const advBtnSpan = document.querySelector('#advancedToggle span');
+    if (advBtnSpan) advBtnSpan.innerHTML = `<i data-lucide="chevron-down" class="h-4 w-4 text-ink3 chevron-icon" id="chevronIcon"></i> ${t.sec_advanced}`;
+    const lblMargin = document.querySelector('label[for="designMargin"]');
+    if (lblMargin) lblMargin.innerHTML = `${t.lbl_design_margin} <span class="text-ink3 font-normal">${t.hint_margin}</span>`;
+    const lblAging = document.querySelector('label[for="agingFactor"]');
+    if (lblAging) lblAging.innerHTML = `${t.lbl_aging_factor} <span class="text-ink3 font-normal">${t.hint_aging}</span>`;
+    const lblTemp = document.querySelector('label[for="temperature"]');
+    if (lblTemp) lblTemp.textContent = t.lbl_ambient_temp;
+
+    // Backup Time Card
+    const backupCardH3 = document.querySelector('#backupTimeCard h3');
+    if (backupCardH3) backupCardH3.innerHTML = `<i data-lucide="clock" class="h-4 w-4 text-accent"></i> ${t.sec_backup_time}`;
+    const curBackupTimeEl = document.getElementById('currentBackupTime');
+    if (curBackupTimeEl) curBackupTimeEl.textContent = formatBackupTimeLabel(backupTimeMin, currentLang);
+
+    // Saved Configs Card
+    const savedH3 = document.querySelector('#savedConfigsList')?.closest('.card')?.querySelector('h3');
+    if (savedH3) savedH3.textContent = t.sec_saved_configs;
+    const savedHintP = document.querySelector('#savedConfigsList')?.closest('.card')?.querySelector('p.text-ink3');
+    if (savedHintP) savedHintP.textContent = t.hint_saved_configs;
+    setText('savedConfigsEmpty', t.empty_saved_configs);
+
+    // Copy Summary Card
+    const summaryH3 = document.querySelector('#configSummaryText')?.closest('.card')?.querySelector('h3');
+    if (summaryH3) summaryH3.innerHTML = `<i data-lucide="clipboard-list" class="h-4 w-4 text-accent"></i> ${t.sec_current_summary}`;
+    setText('copyConfigBtnText', t.btn_copy_config);
+    const exportBtnSpan = document.querySelector('#exportTableBtn span');
+    if (exportBtnSpan) exportBtnSpan.textContent = t.btn_export_table;
+    const copyHintP = document.querySelector('#configSummaryText')?.closest('.card')?.querySelector('p.text-ink3');
+    if (copyHintP) copyHintP.textContent = t.hint_copy_config;
+
+    // Steps Card
+    setText('stepsTitle', t.sec_calc_steps);
+
+    // Voltage Boundary Card
+    setText('voltagePanelTitle', t.voltage_panel_title);
+    const upsRangeP = document.querySelector('#voltagePanel p.tracking-wider');
+    if (upsRangeP) upsRangeP.textContent = t.lbl_ups_volt_range;
+    const upsHintP = document.querySelector('#voltagePanel p.text-accent');
+    if (upsHintP) upsHintP.textContent = t.hint_ups_range_edit;
+    const battRangeP = document.querySelectorAll('#voltagePanel p.tracking-wider')[1];
+    if (battRangeP) battRangeP.textContent = t.lbl_batt_volt_range;
+    const disSpan = document.querySelector('#vvDischargeLower')?.previousElementSibling;
+    if (disSpan) disSpan.textContent = t.lbl_dis_lower_vv;
+    const chgSpan = document.querySelector('#vvChargeUpper')?.previousElementSibling;
+    if (chgSpan) chgSpan.textContent = t.lbl_chg_upper_vv;
+
+    // Stat Cards Titles
+    const setCardTitle = (cardId, title) => {
+        const el = document.querySelector(`#${cardId} .stat-title`);
+        if (el) el.textContent = title;
+    };
+    setCardTitle('cardRequiredPower', t.stat_req_power);
+    setCardTitle('cardProposedPower', t.stat_proposed_power);
+    setCardTitle('cardWattPerCell', t.stat_cell_lookup_w);
+    setCardTitle('cardPowerPerUnit', t.stat_power_per_block);
+    setCardTitle('cardPowerPerString', t.stat_power_per_string);
+    setCardTitle('cardMaxCurrent', t.stat_max_current);
+    setCardTitle('cardMaxCurrentPerString', t.stat_max_current_string);
+    setCardTitle('cardNominalVoltage', t.stat_nominal_volt);
+    setCardTitle('cardFloatVoltage', t.stat_float_volt);
+    setCardTitle('cardRequiredEnergy', t.stat_req_energy);
+    setCardTitle('cardProvidedEnergy', t.stat_provided_energy);
+    setCardTitle('cardDcDemand', t.stat_dc_demand);
+    setCardTitle('cardDcCellCapability', t.stat_dc_cell_cap);
+    setCardTitle('cardDcAvailCurrent', t.stat_dc_avail_curr);
+    setCardTitle('cardDcVoltWindow', t.stat_dc_volt_window);
+    setCardTitle('cardDcPeakPulse', t.stat_dc_pulse);
+    setCardTitle('cardDcTotalAh', t.stat_dc_cum_ah);
+    
+    const configDetailsTitle = document.querySelector('#configDetailsCard h4.stat-title');
+    if (configDetailsTitle) configDetailsTitle.textContent = t.sec_config_details;
+
+    setText('powerModeAutoBtn', isEn ? 'Auto' : '自动');
+    setText('powerModeManualBtn', isEn ? 'Manual' : '手动');
+    setText('energyModeAutoBtn', isEn ? 'Auto' : '自动');
+    setText('energyModeManualBtn', isEn ? 'Manual' : '手动');
+
+    // Hero Labels
+    const setHeroLabel = (cardId, labelText) => {
+        const el = document.querySelector(`#${cardId} .hero-label`);
+        if (el) el.textContent = labelText;
+    };
+    setHeroLabel('heroSatisfaction', isEn ? (calcMode === 'dc' ? 'DC Duty Satisfaction' : 'Power Satisfaction') : (calcMode === 'dc' ? '直流工况满足率' : '功率满足率'));
+    setHeroLabel('heroEnergySatisfaction', t.hero_sat_energy);
+    setHeroLabel('heroWeightCard', t.hero_weight);
+    setHeroLabel('capHeroSatCard', t.hero_sat_energy);
+    setHeroLabel('dcHeroSatCard', t.hero_sat_dc);
+    setHeroLabel('dcHeroWeightCard', t.hero_weight_dc);
+    const dcHeroWeightSub = document.getElementById('dcHeroWeightSub');
+    if (dcHeroWeightSub) dcHeroWeightSub.textContent = t.hero_weight_sub_dc;
+
+    // Sync modal language and default
+    if (typeof exportModalState !== 'undefined') {
+        exportModalState.exportLang = currentLang;
+    }
+    const radios = document.querySelectorAll('input[name="exportLangRadio"]');
+    radios.forEach(r => { r.checked = (r.value === currentLang); });
+    if (typeof updateExportModalStaticTexts === 'function') {
+        updateExportModalStaticTexts(currentLang);
+    }
+
+    // Re-render calculation and views
+    if (typeof updateModeRecommend === 'function') updateModeRecommend();
+    if (typeof recalculate === 'function') recalculate();
+    lucide.createIcons();
+}
+
+function initLanguageEvents() {
+    const wrap = document.getElementById('langPickerWrap');
+    const btn = document.getElementById('langPickerBtn');
+    const menu = document.getElementById('langMenu');
+    if (btn && menu) {
+        btn.onclick = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            const themeMenu = document.getElementById('themeMenu');
+            if (themeMenu) themeMenu.classList.remove('open');
+            menu.classList.toggle('open');
+        };
+        menu.onclick = function (e) {
+            e.stopPropagation();
+            const item = e.target.closest('[data-lang-id]');
+            if (!item) return;
+            applyLanguage(item.dataset.langId);
+            menu.classList.remove('open');
+        };
+        document.addEventListener('click', function (e) {
+            if (!e.target.closest('#langPickerWrap')) {
+                menu.classList.remove('open');
+            }
+        });
+    }
+}
+
+/* ══════════════════════════════════════════════════════════════════
    THEME SYSTEM — 6 套主题（CSS 变量驱动 + localStorage 记忆）
    ══════════════════════════════════════════════════════════════════ */
 const THEMES = [
@@ -4365,6 +5802,8 @@ function applyTheme(themeId) {
 }
 /** 渲染主题宫格下拉 */
 function renderThemeMenu() {
+    const langMenu = document.getElementById('langMenu');
+    if (langMenu && langMenu.classList.contains('open')) { langMenu.classList.remove('open'); return; }
     const menu = document.getElementById('themeMenu');
     if (!menu) return;
     menu.innerHTML = THEMES.map(t => `
@@ -4376,6 +5815,7 @@ function renderThemeMenu() {
 }
 document.getElementById('themePickerBtn').addEventListener('click', function (e) {
     e.stopPropagation();
+    document.getElementById('langMenu')?.classList.remove('open');
     document.getElementById('themeMenu').classList.toggle('open');
 });
 document.getElementById('themeMenu').addEventListener('click', function (e) {
@@ -4391,6 +5831,8 @@ document.addEventListener('click', function (e) {
 });
 applyTheme(currentTheme);
 renderThemeMenu();
+initLanguageEvents();
+applyLanguage(currentLang);
 
 /* ══════════════════════════════════════════════════════════════════
    AI SIDEBAR LAYOUT — 开合 / 拖拽调宽 / 移动端抽屉 / 状态记忆
@@ -5370,9 +6812,9 @@ const CFG_FIELDS = [
       validate: vNum, apply: v => { $id('blocksPerGroupDisplay').value = v; syncCellsFromBlocks(); }, card: 'cardNominalVoltage' },
     { key: 'numberOfStrings', label: '电池组数', min: 1, current: () => $id('numberOfStrings').value,
       validate: vNum, apply: v => { $id('numberOfStrings').value = v; }, card: 'cardPowerPerString' },
-    { key: 'designMargin', label: '设计余量', min: 0.8, max: 2, current: () => $id('designMargin').value,
+    { key: 'designMargin', label: '设计余量', min: 0.1, max: 3, current: () => $id('designMargin').value,
       validate: vNum, apply: v => { $id('designMargin').value = v; }, card: 'cardRequiredPower' },
-    { key: 'agingFactor', label: '老化系数', min: 0.5, max: 2, current: () => $id('agingFactor').value,
+    { key: 'agingFactor', label: '老化系数', min: 0.1, max: 3, current: () => $id('agingFactor').value,
       validate: vNum, apply: v => { $id('agingFactor').value = v; }, card: 'cardRequiredPower' },
     { key: 'temperature', label: '环境温度 (℃)', min: -20, max: 60, current: () => $id('temperature').value,
       validate: vNum, apply: v => { $id('temperature').value = v; } },
@@ -5559,6 +7001,7 @@ document.addEventListener('keydown', function (e) {
 });
 
 window.addEventListener('DOMContentLoaded', async function () {
+    applyLanguage(currentLang);
     lucide.createIcons();
     applyPowerModeUI('auto');
     updateModeRecommend();

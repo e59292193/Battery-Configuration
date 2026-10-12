@@ -31,7 +31,7 @@ function loadEngine(htmlPath, label) {
     const code = part1 + '\n' + part2 + '\n' +
         'return { BATTERY_MODELS, BATTERY_MODEL_MAP, matchEpvKey, matchTimePoint, lookupCapability,' +
         ' sizeDutyBySection, computeDutyChecks, estimateRuntimeMin, avgCellVoltage, computeDutySummary,' +
-        ' epvOutOfRange, calculate, calculateCapacity };';
+        ' getFactorMultiplier, formatFactorText, epvOutOfRange, calculate, calculateCapacity };';
     return new Function(code)();
 }
 
@@ -46,9 +46,9 @@ console.log('计算引擎工程正确性测试');
 console.log('═'.repeat(72));
 
 // ────────────────────────────────────────────────────────────────
-// 1. 老化系数必须放大需求（旧版写成除法，方向反了）
+// 1. 高级参数（老化系数与设计余量）：>=1 乘法计算，<1 除法计算
 // ────────────────────────────────────────────────────────────────
-console.log('1. 老化系数方向:');
+console.log('1. 高级参数（老化系数与设计余量）计算规则:');
 const baseInput = {
     batteryModelId: '8XNFG90', upsRatingKva: 100, systemVoltage: 240, powerFactor: 0.9,
     inverterEfficiency: 0.95, agingFactor: 1, designMargin: 1, epv: 1.3, backupTimeMin: 60,
@@ -56,11 +56,28 @@ const baseInput = {
     requiredPowerMode: 'auto', blocksPerGroup: 18
 };
 const r1 = E.calculate(baseInput);
-const r1Aged = E.calculate({ ...baseInput, agingFactor: 1.2 });
+const r1AgedMul = E.calculate({ ...baseInput, agingFactor: 1.2 });
+const r1AgedDiv = E.calculate({ ...baseInput, agingFactor: 0.8 });
+const r1MarginMul = E.calculate({ ...baseInput, designMargin: 1.1 });
+const r1MarginDiv = E.calculate({ ...baseInput, designMargin: 0.9 });
+const r1BothDiv = E.calculate({ ...baseInput, agingFactor: 0.8, designMargin: 0.9 });
+
 assert.ok(near(r1.autoRequiredPower, 100000 * 0.9 / 0.95, 0.01), '基准需求功率');
-assert.ok(near(r1Aged.autoRequiredPower, r1.autoRequiredPower * 1.2, 0.01),
-    `老化 1.2 应放大需求 20%，实际 ${(r1Aged.autoRequiredPower / r1.autoRequiredPower).toFixed(3)}x`);
-ok('老化系数 1.2 → 需求功率 ×1.20', `${(r1.autoRequiredPower / 1000).toFixed(2)} kW → ${(r1Aged.autoRequiredPower / 1000).toFixed(2)} kW`);
+assert.ok(near(r1AgedMul.autoRequiredPower, r1.autoRequiredPower * 1.2, 0.01), '老化≥1乘法');
+assert.ok(near(r1AgedDiv.autoRequiredPower, r1.autoRequiredPower / 0.8, 0.01), '老化<1除法');
+assert.ok(near(r1MarginMul.autoRequiredPower, r1.autoRequiredPower * 1.1, 0.01), '余量≥1乘法');
+assert.ok(near(r1MarginDiv.autoRequiredPower, r1.autoRequiredPower / 0.9, 0.01), '余量<1除法');
+assert.ok(near(r1BothDiv.autoRequiredPower, r1.autoRequiredPower / 0.8 / 0.9, 0.01), '两者<1双除法');
+
+assert.equal(E.formatFactorText('老化', 1.25), '× 老化 1.25');
+assert.equal(E.formatFactorText('老化', 0.8), '÷ 老化 0.8');
+assert.equal(E.formatFactorText('余量', 1.1), '× 余量 1.1');
+assert.equal(E.formatFactorText('余量', 0.9), '÷ 余量 0.9');
+
+ok('老化系数 ≥1 乘法 (1.2x)', `${(r1.autoRequiredPower / 1000).toFixed(2)} kW → ${(r1AgedMul.autoRequiredPower / 1000).toFixed(2)} kW`);
+ok('老化系数 <1 除法 (/0.8 即 1.25x)', `${(r1.autoRequiredPower / 1000).toFixed(2)} kW → ${(r1AgedDiv.autoRequiredPower / 1000).toFixed(2)} kW`);
+ok('设计余量 ≥1 乘法 (1.1x) 与 <1 除法 (/0.9 即 1.11x)', `双向校验通过`);
+ok('综合双除法 (老化0.8 & 余量0.9)', `${(r1.autoRequiredPower / 1000).toFixed(2)} kW → ${(r1BothDiv.autoRequiredPower / 1000).toFixed(2)} kW`);
 
 // ────────────────────────────────────────────────────────────────
 // 2. 阶梯工况：kVA → 电池侧能量口径必须自洽
