@@ -22,3 +22,6 @@ Thumbs.db
 # 构建产物（本项目为零构建，此条仅为防御）
 dist/
 build/
+
+# 本地临时对照文件
+calc_w_v19.html

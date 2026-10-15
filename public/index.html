@@ -1381,6 +1381,375 @@
                         </div>
 
                     </div>
+
+                    <!-- ══════════════════════════════════════════════════════════════════
+                         同工况方案对比：锌镍电池 vs 传统铅酸 (Zn-Ni vs. Lead-Acid Comparison)
+                         ══════════════════════════════════════════════════════════════════ -->
+                    <div class="lg:col-span-2 space-y-4" id="batteryComparisonSection">
+                        <div class="card p-5 relative overflow-hidden transition-all duration-300" style="border: 1px solid rgb(var(--c-accent)/0.35); background: linear-gradient(180deg, rgb(var(--c-panel)/0.92) 0%, rgb(var(--c-elevated)/0.88) 100%);">
+                            
+                            <!-- Ambient Glows -->
+                            <div class="pointer-events-none absolute -right-20 -top-20 h-64 w-64 rounded-full blur-3xl opacity-20" style="background: radial-gradient(circle, rgb(var(--c-accent)), rgb(var(--c-ok)));"></div>
+                            <div class="pointer-events-none absolute -left-20 -bottom-20 h-64 w-64 rounded-full blur-3xl opacity-15" style="background: radial-gradient(circle, rgb(var(--c-ok)), transparent);"></div>
+
+                            <!-- 4.1 顶部控制栏 (Header & Controls Bar) -->
+                            <div class="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-4 pb-4 border-b border-line/60">
+                                <!-- Title & Subtitle -->
+                                <div class="space-y-1">
+                                    <div class="flex items-center gap-2.5 flex-wrap">
+                                        <span class="inline-flex items-center justify-center h-7 w-7 rounded-lg bg-accent/15 text-accent font-black text-sm shadow-sm">⚡</span>
+                                        <h3 class="text-base font-extrabold tracking-tight text-ink flex items-center gap-2" id="cmpTitle">
+                                            UPS 备电方案同台对比 (Zn-Ni vs. Lead-Acid)
+                                        </h3>
+                                        <span class="badge badge-acc text-[11px] font-bold" id="cmpBadge">
+                                            同工况对标 Benchmark
+                                        </span>
+                                    </div>
+                                    <p class="text-xs text-ink3" id="cmpSubtitle">
+                                        在完全相同的系统母线电压、负载需求与备电时长下，对标行业高倍率铅酸方案
+                                    </p>
+                                </div>
+
+                                <!-- Benchmark Mapping & Controls -->
+                                <div class="flex items-center flex-wrap gap-2.5">
+                                    <!-- 铅酸型号切换下拉 -->
+                                    <div class="flex items-center gap-1.5 bg-panel/90 border border-line/70 rounded-lg px-2.5 py-1.5 shadow-sm">
+                                        <label for="cmpLeadAcidModelSelect" class="text-[11px] font-bold text-ink3 uppercase shrink-0" id="cmpLblLaModel">
+                                            铅酸对标:
+                                        </label>
+                                        <select id="cmpLeadAcidModelSelect" class="bg-transparent text-xs font-bold text-ink focus:outline-none cursor-pointer">
+                                            <option value="LHR12400W">理士 LHR12400W (12V 100Ah)</option>
+                                            <option value="LHR12800W">理士 LHR12800W (12V 210Ah)</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- 铅酸截止电压下拉 -->
+                                    <div class="flex items-center gap-1.5 bg-panel/90 border border-line/70 rounded-lg px-2.5 py-1.5 shadow-sm">
+                                        <label for="cmpLeadAcidEpvSelect" class="text-[11px] font-bold text-ink3 uppercase shrink-0" id="cmpLblLaEpv">
+                                            铅酸截止:
+                                        </label>
+                                        <select id="cmpLeadAcidEpvSelect" class="bg-transparent text-xs font-bold text-ink focus:outline-none cursor-pointer">
+                                            <option value="1.85">1.85 V/cell</option>
+                                            <option value="1.80">1.80 V/cell</option>
+                                            <option value="1.75">1.75 V/cell</option>
+                                            <option value="1.70">1.70 V/cell</option>
+                                            <option value="1.67" selected>1.67 V/cell (推荐)</option>
+                                            <option value="1.60">1.60 V/cell</option>
+                                        </select>
+                                    </div>
+
+                                    <!-- 铅酸串并联微调 -->
+                                    <div class="flex items-center gap-1.5 bg-panel/90 border border-line/70 rounded-lg px-2 py-1 shadow-sm">
+                                        <span class="text-[10px] font-bold text-ink3" id="cmpLblLaTopology">串/并微调:</span>
+                                        <div class="flex items-center gap-1" title="铅酸单串块数">
+                                            <input type="number" id="cmpLaSeriesBlocks" class="w-12 text-center text-xs font-bold bg-elev/80 rounded border border-line/50 px-1 py-0.5 text-ink" min="1" step="1">
+                                            <span class="text-[10px] text-ink3" id="cmpUnitSeries">串</span>
+                                        </div>
+                                        <span class="text-ink3 text-xs">×</span>
+                                        <div class="flex items-center gap-1" title="铅酸并联组数">
+                                            <input type="number" id="cmpLaParallelStrings" class="w-10 text-center text-xs font-bold bg-elev/80 rounded border border-line/50 px-1 py-0.5 text-ink" min="1" step="1">
+                                            <span class="text-[10px] text-ink3" id="cmpUnitParallel">并</span>
+                                        </div>
+                                        <button type="button" id="cmpResetLaBtn" class="btn btn-ghost px-1.5 py-0.5 text-[10px] rounded hover:text-accent ml-0.5" title="恢复自动推荐">
+                                            自动
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 当前对比组合指示条 -->
+                            <div class="relative z-10 mt-3 flex items-center justify-between flex-wrap gap-2 px-3 py-1.5 rounded-lg bg-elev/60 border border-line/40 text-xs">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-ink3 font-medium" id="cmpPairLead">当前对比组合:</span>
+                                    <span class="font-bold text-ok" id="cmpZnNiPairName">华塑 8XNFZ38 (13.2V 38Ah)</span>
+                                    <span class="text-ink3 font-bold">VS</span>
+                                    <span class="font-bold text-amber-500" id="cmpLaPairName">理士 LHR12400W (12V 100Ah)</span>
+                                </div>
+                                <div id="cmpAutoEpvNotice" class="text-[11px] font-medium text-amber-400 hidden flex items-center gap-1">
+                                    <span>⚠️</span> <span id="cmpAutoEpvNoticeText"></span>
+                                </div>
+                            </div>
+
+                            <!-- 4.2 核心对比双子卡片 (Side-by-Side Dual Cards) -->
+                            <div class="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                
+                                <!-- LEFT: 锌镍电池方案 (Our Zn-Ni Solution) -->
+                                <div class="rounded-xl border-2 p-4 transition-all duration-300 relative overflow-hidden" 
+                                     style="border-color: rgb(var(--c-ok)/0.8); background: linear-gradient(145deg, rgb(var(--c-ok)/0.09) 0%, rgb(var(--c-panel)/0.95) 100%); box-shadow: 0 4px 20px rgb(var(--c-ok)/0.12);">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="h-2.5 w-2.5 rounded-full bg-ok shadow-sm animate-pulse"></span>
+                                            <h4 class="text-sm font-extrabold text-ok tracking-wide uppercase" id="cmpZnNiCardTitle">我方锌镍电池方案 (Zn-Ni)</h4>
+                                        </div>
+                                        <span class="badge badge-ok text-[11px] font-black tracking-wide" id="cmpZnNiBadge">🌟 推荐方案</span>
+                                    </div>
+
+                                    <!-- 第一行：总块数大字对比 -->
+                                    <div class="rounded-lg p-3.5 mb-4 border border-ok/30" style="background: rgb(var(--c-ok)/0.10);">
+                                        <div class="flex items-baseline justify-between">
+                                            <span class="text-xs font-bold text-ink2 uppercase tracking-wider" id="cmpLblZnBlocks">总块数 Total Blocks</span>
+                                            <span class="badge text-xs font-black tracking-wide bg-ok/25 text-ok" id="cmpBlockSavingBadge">
+                                                节省 50.0% 数量
+                                            </span>
+                                        </div>
+                                        <div class="mt-1 flex items-baseline gap-2">
+                                            <span class="text-3xl lg:text-4xl font-black text-ink tracking-tight font-mono" id="cmpZnTotalBlocks">—</span>
+                                            <span class="text-sm font-bold text-ok" id="cmpZnBlocksUnit">块</span>
+                                        </div>
+                                        <p class="text-xs font-medium text-ink2 mt-1" id="cmpZnTopologyDesc">
+                                            — 串 × — 并 (— 节)
+                                        </p>
+                                    </div>
+
+                                    <!-- 第二行：四大关键指标横向进度条与数据 -->
+                                    <div class="space-y-3.5 text-xs">
+                                        <!-- 1. 总重量 -->
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-semibold text-ink2 flex items-center gap-1.5">
+                                                    <span>⚖️</span> <span id="cmpLblZnWeight">系统总重量</span>
+                                                </span>
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="font-mono font-bold text-sm text-ok" id="cmpZnTotalWeight">— kg</span>
+                                                    <span class="badge badge-ok text-[10px] font-bold" id="cmpWeightSavingBadge">减重 —%</span>
+                                                </div>
+                                            </div>
+                                            <div class="h-2 w-full rounded-full bg-line/60 overflow-hidden flex">
+                                                <div id="cmpZnWeightBar" class="h-full rounded-full transition-all duration-500 bg-ok" style="width: 25%;"></div>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] text-ink3">
+                                                <span id="cmpZnWeightPerUnit">单块 — kg</span>
+                                                <span class="font-semibold text-ok" id="cmpWeightSavedKg">减轻 — kg</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- 2. 总体积 / 占地空间 -->
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-semibold text-ink2 flex items-center gap-1.5">
+                                                    <span>📦</span> <span id="cmpLblZnVol">系统总体积</span>
+                                                </span>
+                                                <div class="flex items-center gap-1.5">
+                                                    <span class="font-mono font-bold text-sm text-ok" id="cmpZnTotalVol">— L</span>
+                                                    <span class="badge badge-ok text-[10px] font-bold" id="cmpVolSavingBadge">省空间 —%</span>
+                                                </div>
+                                            </div>
+                                            <div class="h-2 w-full rounded-full bg-line/60 overflow-hidden flex">
+                                                <div id="cmpZnVolBar" class="h-full rounded-full transition-all duration-500 bg-emerald-500" style="width: 30%;"></div>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] text-ink3">
+                                                <span id="cmpZnVolPerUnit">单块 — L</span>
+                                                <span class="font-semibold text-ok" id="cmpVolSavedL">节省 — L</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- 3. 工况满足率 -->
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-semibold text-ink2 flex items-center gap-1.5">
+                                                    <span>🎯</span> <span id="cmpLblZnSat">工况满足率</span>
+                                                </span>
+                                                <span class="font-mono font-bold text-sm text-ok" id="cmpZnSatisfaction">—%</span>
+                                            </div>
+                                            <div class="h-2 w-full rounded-full bg-line/60 overflow-hidden">
+                                                <div id="cmpZnSatBar" class="h-full rounded-full transition-all duration-500 bg-ok" style="width: 100%;"></div>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] text-ink3">
+                                                <span id="cmpZnSatDesc">额定达标 (≥100%)</span>
+                                                <span id="cmpZnSatCap">—</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- 4. 单串总电压与充放电窗口匹配度 -->
+                                        <div class="rounded-lg bg-panel/70 border border-line/50 p-2.5 space-y-1.5">
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-ink3 font-semibold" id="cmpLblZnNomVolt">标称总电压:</span>
+                                                <span class="font-mono font-bold text-ink" id="cmpZnNomVolt">— V</span>
+                                            </div>
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-ink3 font-semibold" id="cmpLblZnChgVolt">浮充 / 均充电压:</span>
+                                                <span class="font-mono font-bold text-ok" id="cmpZnChgVolt">— V / — V</span>
+                                            </div>
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-ink3 font-semibold" id="cmpLblZnCutoffVolt">截止总电压:</span>
+                                                <span class="font-mono font-bold text-ink2" id="cmpZnCutoffVolt">— V</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- RIGHT: 传统铅酸电池方案 (Benchmark Lead-Acid Solution) -->
+                                <div class="rounded-xl border p-4 transition-all duration-300 relative overflow-hidden" 
+                                     style="border-color: rgb(var(--c-border)/0.8); background: linear-gradient(145deg, rgb(var(--c-elevated)/0.7) 0%, rgb(var(--c-panel)/0.95) 100%);">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-2">
+                                            <span class="h-2.5 w-2.5 rounded-full bg-amber-500"></span>
+                                            <h4 class="text-sm font-extrabold text-ink2 tracking-wide uppercase" id="cmpLaCardTitle">传统高倍率铅酸方案 (VRLA)</h4>
+                                        </div>
+                                        <span class="badge text-[11px] font-bold bg-amber-500/15 text-amber-500" id="cmpLaBadge">传统基准 Benchmark</span>
+                                    </div>
+
+                                    <!-- 第一行：总块数大字对比 -->
+                                    <div class="rounded-lg p-3.5 mb-4 border border-line/60 bg-elev/80">
+                                        <div class="flex items-baseline justify-between">
+                                            <span class="text-xs font-bold text-ink3 uppercase tracking-wider" id="cmpLblLaBlocks">总块数 Total Blocks</span>
+                                            <span class="badge text-xs font-semibold bg-line/80 text-ink3" id="cmpLaBlocksBadge">对标配置</span>
+                                        </div>
+                                        <div class="mt-1 flex items-baseline gap-2">
+                                            <span class="text-3xl lg:text-4xl font-black text-ink tracking-tight font-mono" id="cmpLaTotalBlocks">—</span>
+                                            <span class="text-sm font-bold text-ink3" id="cmpLaBlocksUnit">块</span>
+                                        </div>
+                                        <p class="text-xs font-medium text-ink3 mt-1" id="cmpLaTopologyDesc">
+                                            — 串 × — 并 (— 节)
+                                        </p>
+                                    </div>
+
+                                    <!-- 第二行：四大关键指标横向进度条与数据 -->
+                                    <div class="space-y-3.5 text-xs">
+                                        <!-- 1. 总重量 -->
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-semibold text-ink3 flex items-center gap-1.5">
+                                                    <span>⚖️</span> <span id="cmpLblLaWeight">系统总重量</span>
+                                                </span>
+                                                <span class="font-mono font-bold text-sm text-ink2" id="cmpLaTotalWeight">— kg</span>
+                                            </div>
+                                            <div class="h-2 w-full rounded-full bg-line/60 overflow-hidden flex">
+                                                <div id="cmpLaWeightBar" class="h-full rounded-full transition-all duration-500 bg-amber-600/70" style="width: 100%;"></div>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] text-ink3">
+                                                <span id="cmpLaWeightPerUnit">单块 — kg (重约 3~4 倍)</span>
+                                                <span id="cmpLaWeightRatioDesc">—</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- 2. 总体积 / 占地空间 -->
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-semibold text-ink3 flex items-center gap-1.5">
+                                                    <span>📦</span> <span id="cmpLblLaVol">系统总体积</span>
+                                                </span>
+                                                <span class="font-mono font-bold text-sm text-ink2" id="cmpLaTotalVol">— L</span>
+                                            </div>
+                                            <div class="h-2 w-full rounded-full bg-line/60 overflow-hidden flex">
+                                                <div id="cmpLaVolBar" class="h-full rounded-full transition-all duration-500 bg-slate-500" style="width: 100%;"></div>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] text-ink3">
+                                                <span id="cmpLaVolPerUnit">单块 — L (大体积)</span>
+                                                <span id="cmpLaVolRatioDesc">—</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- 3. 工况满足率 -->
+                                        <div class="space-y-1">
+                                            <div class="flex items-center justify-between">
+                                                <span class="font-semibold text-ink3 flex items-center gap-1.5">
+                                                    <span>🎯</span> <span id="cmpLblLaSat">工况满足率</span>
+                                                </span>
+                                                <span class="font-mono font-bold text-sm text-ink2" id="cmpLaSatisfaction">—%</span>
+                                            </div>
+                                            <div class="h-2 w-full rounded-full bg-line/60 overflow-hidden">
+                                                <div id="cmpLaSatBar" class="h-full rounded-full transition-all duration-500 bg-amber-500" style="width: 100%;"></div>
+                                            </div>
+                                            <div class="flex justify-between text-[10px] text-ink3">
+                                                <span id="cmpLaSatDesc">标准核算</span>
+                                                <span id="cmpLaSatCap">—</span>
+                                            </div>
+                                        </div>
+
+                                        <!-- 4. 单串总电压与充放电窗口匹配度 -->
+                                        <div class="rounded-lg bg-panel/70 border border-line/50 p-2.5 space-y-1.5">
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-ink3 font-semibold" id="cmpLblLaNomVolt">标称总电压:</span>
+                                                <span class="font-mono font-bold text-ink" id="cmpLaNomVolt">— V</span>
+                                            </div>
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-ink3 font-semibold" id="cmpLblLaChgVolt">浮充 / 均充电压:</span>
+                                                <span class="font-mono font-bold text-ink2" id="cmpLaChgVolt">— V / — V</span>
+                                            </div>
+                                            <div class="flex items-center justify-between text-[11px]">
+                                                <span class="text-ink3 font-semibold" id="cmpLblLaCutoffVolt">截止总电压:</span>
+                                                <span class="font-mono font-bold text-ink2" id="cmpLaCutoffVolt">— V</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- 4.3 底部 UPS 核心价值汇总四宫格 (Bottom Core Value Grid) -->
+                            <div class="relative z-10 mt-5 pt-4 border-t border-line/60">
+                                <h4 class="text-xs font-bold text-ink3 uppercase tracking-wider mb-3 flex items-center gap-1.5" id="cmpGridTitle">
+                                    <span>🏆</span> 锌镍电池对比铅酸在 UPS 备电场景的核心价值矩阵 Core Value Matrix
+                                </h4>
+                                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                                    <!-- 1. 高倍率放电能力 -->
+                                    <div class="rounded-xl border border-line/60 p-3 bg-elev/40 hover:bg-elev/70 transition flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-1.5">
+                                                <span class="h-6 w-6 rounded-md bg-amber-500/15 text-amber-500 flex items-center justify-center text-xs font-black">⚡</span>
+                                                <h5 class="text-xs font-extrabold text-ink" id="cmpV1Title">10C 超高倍率放电</h5>
+                                            </div>
+                                            <p class="text-[11px] text-ink2 leading-relaxed" id="cmpV1Desc">
+                                                支持高达 10C 持续大电流放电，无铅酸严重的 Peukert 容量打折；5~15min 短时备电以小安时胜任大安时铅酸。
+                                            </p>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-line/40 text-[10px] text-ok font-semibold" id="cmpV1Footer">
+                                            ✓ 无 Peukert 效应折损
+                                        </div>
+                                    </div>
+
+                                    <!-- 2. 极致安全与消防 -->
+                                    <div class="rounded-xl border border-line/60 p-3 bg-elev/40 hover:bg-elev/70 transition flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-1.5">
+                                                <span class="h-6 w-6 rounded-md bg-emerald-500/15 text-emerald-500 flex items-center justify-center text-xs font-black">🛡️</span>
+                                                <h5 class="text-xs font-extrabold text-ink" id="cmpV2Title">本征安全与消防过检</h5>
+                                            </div>
+                                            <p class="text-[11px] text-ink2 leading-relaxed" id="cmpV2Desc">
+                                                通过 UL9540A 权威测试，针刺短路不起火不爆炸；水性不可燃电解液；放电无开路故障模式。
+                                            </p>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-line/40 text-[10px] text-ok font-semibold" id="cmpV2Footer">
+                                            ✓ UL9540A 认证无热失控
+                                        </div>
+                                    </div>
+
+                                    <!-- 3. 寿命与全生命周期成本 (TCO) -->
+                                    <div class="rounded-xl border border-line/60 p-3 bg-elev/40 hover:bg-elev/70 transition flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-1.5">
+                                                <span class="h-6 w-6 rounded-md bg-blue-500/15 text-blue-500 flex items-center justify-center text-xs font-black">⏳</span>
+                                                <h5 class="text-xs font-extrabold text-ink" id="cmpV3Title">15年长寿命与低 TCO</h5>
+                                            </div>
+                                            <p class="text-[11px] text-ink2 leading-relaxed" id="cmpV3Desc">
+                                                15年设计寿命 + 500次 100% DOD 循环；深放电不硫化；机房全生命周期免换电池，总拥有成本大幅降低。
+                                            </p>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-line/40 text-[10px] text-ok font-semibold" id="cmpV3Footer">
+                                            ✓ 15年设计寿命免换新
+                                        </div>
+                                    </div>
+
+                                    <!-- 4. 环境适应性与绿色节能 -->
+                                    <div class="rounded-xl border border-line/60 p-3 bg-elev/40 hover:bg-elev/70 transition flex flex-col justify-between">
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-1.5">
+                                                <span class="h-6 w-6 rounded-md bg-purple-500/15 text-purple-500 flex items-center justify-center text-xs font-black">🌡️</span>
+                                                <h5 class="text-xs font-extrabold text-ink" id="cmpV4Title">宽温适应与绿色节能</h5>
+                                            </div>
+                                            <p class="text-[11px] text-ink2 leading-relaxed" id="cmpV4Desc">
+                                                -20°C~55°C 宽温高效工作，耐高温特性允许调高机房空调设定温度，降低制冷 PUE；无重金属铅和强酸。
+                                            </p>
+                                        </div>
+                                        <div class="mt-2 pt-2 border-t border-line/40 text-[10px] text-ok font-semibold" id="cmpV4Footer">
+                                            ✓ -20°C~55°C 降低空调能耗
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                        </div>
+                    </div>
                 </div>
 
             </div>
@@ -1739,7 +2108,7 @@ const BATTERY_MODELS = [
             "1.25": { 5:823.0, 6:733.3, 10:489.8, 15:334.5, 20:251.3, 30:170.2, 45:115.3, 60:87.4, 120:44.2, 180:29.8, 240:22.5, 300:18.1, 360:15.1, 480:11.4, 600:9.1, 720:7.6, 900:6.1, 1200:4.6 },
             "1.20": { 5:870.9, 6:761.4, 10:497.6, 15:341.7, 20:253.6, 30:171.9, 45:116.6, 60:88.5, 120:44.4, 180:30.0, 240:22.6, 300:18.2, 360:15.2, 480:11.4, 600:9.2, 720:7.6, 900:6.1, 1200:4.6 }
         },
-        specs: { label: "13.2V 90Ah", weightKg: 17.3, lengthM: 0.2912, widthM: 0.176, heightM: 0.184, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 90, maxDischargeA: 900 }
+        specs: { label: "13.2V 90Ah", weightKg: 17.3, officialWeightKg: 18.3, lengthM: 0.2912, widthM: 0.176, heightM: 0.184, volumeL: 8.33, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 90, maxDischargeA: 900, designLifeYears: 15 }
     },
     {
         id: "8XNFZ38",
@@ -1757,11 +2126,91 @@ const BATTERY_MODELS = [
             "1.25": { 5:385.5, 10:206.3, 15:152.0, 20:114.0, 30:77.70, 45:51.70, 60:39.33, 120:18.94, 180:12.96, 240:9.47, 300:7.77, 360:6.48, 480:4.88, 600:3.89, 720:3.24, 900:2.59, 1200:1.95 },
             "1.20": { 5:394.5, 10:208.2, 15:153.1, 20:114.6, 30:78.20, 45:52.00, 60:39.50, 120:19.00, 180:13.00, 240:9.50, 300:7.80, 360:6.50, 480:4.90, 600:3.90, 720:3.25, 900:2.60, 1200:1.95 }
         },
-        specs: { label: "13.2V 38Ah", weightKg: 7.8, lengthM: 0.2255, widthM: 0.1225, heightM: 0.1405, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 38, maxDischargeA: 380 }
+        specs: { label: "13.2V 38Ah", weightKg: 7.8, officialWeightKg: 7.8, lengthM: 0.2255, widthM: 0.1225, heightM: 0.1405, volumeL: 3.88, cellsPerUnit: 8, ratedVoltage: 13.2, ratedCapacityAh: 38, maxDischargeA: 380, designLifeYears: 15 }
     }
 ];
 const BATTERY_MODEL_MAP = {};
 BATTERY_MODELS.forEach(m => { BATTERY_MODEL_MAP[m.id] = m; });
+
+// ── 传统高倍率铅酸电池数据库 (Lead-Acid Benchmark Models) ────────────────
+const LEAD_ACID_MODELS = [
+    {
+        id: "LHR12400W",
+        nameZh: "理士 LHR12400W (12V 100Ah)",
+        nameEn: "Leoch LHR12400W (12V 100Ah)",
+        targetZnNiModel: "8XNFZ38",
+        specs: {
+            label: "12V 100Ah",
+            ratedVoltage: 12.0,
+            ratedCapacityAh: 100,
+            cellsPerUnit: 6,
+            weightKg: 31.2,
+            lengthM: 0.330,
+            widthM: 0.173,
+            heightM: 0.216,
+            volumeL: 12.33,
+            nominalFloatVcell: 2.275,
+            nominalEqualizeVcell: 2.35,
+            designLifeYears: 12
+        },
+        timePoints: [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 480, 600],
+        dischargeTable: {
+            "1.85": { 5: 506.7, 10: 420.6, 15: 334.5, 20: 273.8, 30: 198.9, 45: 143.8, 60: 113.4, 90: 81.1, 120: 64.9, 180: 48.0, 240: 39.5, 300: 33.7, 480: 24.0, 600: 20.0 },
+            "1.80": { 5: 572.6, 10: 468.7, 15: 372.8, 20: 305.1, 30: 209.9, 45: 151.8, 60: 120.1, 90: 85.5, 120: 68.1, 180: 50.1, 240: 41.0, 300: 35.0, 480: 24.5, 600: 20.5 },
+            "1.75": { 5: 617.2, 10: 489.1, 15: 389.1, 20: 318.4, 30: 219.2, 45: 157.7, 60: 124.8, 90: 88.4, 120: 70.3, 180: 51.8, 240: 42.4, 300: 36.0, 480: 24.9, 600: 20.6 },
+            "1.70": { 5: 655.9, 10: 495.2, 15: 393.9, 20: 322.4, 30: 227.1, 45: 161.9, 60: 127.6, 90: 90.6, 120: 72.1, 180: 53.1, 240: 43.3, 300: 36.6, 480: 25.1, 600: 20.8 },
+            "1.67": { 5: 680.0, 10: 502.8, 15: 400.0, 20: 327.3, 30: 232.6, 45: 165.0, 60: 129.8, 90: 92.8, 120: 73.4, 180: 54.5, 240: 44.1, 300: 37.0, 480: 25.4, 600: 20.9 },
+            "1.60": { 5: 689.7, 10: 510.5, 15: 408.3, 20: 332.3, 30: 236.0, 45: 168.5, 60: 131.5, 90: 94.6, 120: 74.7, 180: 55.0, 240: 44.6, 300: 37.6, 480: 25.6, 600: 21.2 }
+        },
+        constantCurrentTable: {
+            "1.85": { 5: 280.5, 10: 232.4, 15: 185.5, 20: 141.2, 30: 101.0, 45: 72.4, 60: 56.7, 90: 40.5, 120: 32.3, 180: 23.8, 240: 19.4, 300: 16.5, 480: 11.8, 600: 9.70 },
+            "1.80": { 5: 315.9, 10: 258.7, 15: 206.4, 20: 159.6, 30: 107.2, 45: 76.8, 60: 60.3, 90: 42.8, 120: 34.0, 180: 24.9, 240: 20.2, 300: 17.1, 480: 12.1, 600: 10.0 },
+            "1.75": { 5: 343.4, 10: 269.8, 15: 215.2, 20: 165.7, 30: 112.7, 45: 80.1, 60: 62.9, 90: 44.4, 120: 35.2, 180: 25.8, 240: 20.8, 300: 17.6, 480: 12.2, 600: 10.1 },
+            "1.70": { 5: 361.9, 10: 273.1, 15: 217.9, 20: 166.8, 30: 117.7, 45: 82.7, 60: 64.7, 90: 45.8, 120: 36.3, 180: 26.4, 240: 21.3, 300: 18.0, 480: 12.4, 600: 10.2 },
+            "1.67": { 5: 375.0, 10: 277.3, 15: 220.4, 20: 173.7, 30: 121.7, 45: 84.8, 60: 66.3, 90: 46.8, 120: 37.1, 180: 26.9, 240: 21.6, 300: 18.2, 480: 12.5, 600: 10.3 },
+            "1.60": { 5: 383.6, 10: 281.4, 15: 228.6, 20: 179.1, 30: 125.0, 45: 86.5, 60: 67.7, 90: 47.7, 120: 37.8, 180: 27.6, 240: 22.1, 300: 18.6, 480: 12.6, 600: 10.4 }
+        }
+    },
+    {
+        id: "LHR12800W",
+        nameZh: "理士 LHR12800W (12V 210Ah)",
+        nameEn: "Leoch LHR12800W (12V 210Ah)",
+        targetZnNiModel: "8XNFG90",
+        specs: {
+            label: "12V 210Ah",
+            ratedVoltage: 12.0,
+            ratedCapacityAh: 210,
+            cellsPerUnit: 6,
+            weightKg: 66.8,
+            lengthM: 0.522,
+            widthM: 0.240,
+            heightM: 0.226,
+            volumeL: 28.31,
+            nominalFloatVcell: 2.275,
+            nominalEqualizeVcell: 2.35,
+            designLifeYears: 12
+        },
+        timePoints: [5, 10, 15, 20, 30, 45, 60, 90, 120, 180, 240, 300, 480, 600],
+        dischargeTable: {
+            "1.85": { 5: 893.8, 10: 718.8, 15: 627.2, 20: 495.5, 30: 345.0, 45: 274.2, 60: 223.6, 90: 164.5, 120: 135.0, 180: 101.0, 240: 80.2, 300: 68.1, 480: 47.4, 600: 40.6 },
+            "1.80": { 5: 999.8, 10: 804.0, 15: 701.6, 20: 554.3, 30: 385.9, 45: 289.3, 60: 229.8, 90: 168.6, 120: 142.2, 180: 103.9, 240: 82.8, 300: 70.5, 480: 48.3, 600: 41.7 },
+            "1.75": { 5: 1048.8, 10: 843.5, 15: 736.0, 20: 581.4, 30: 404.8, 45: 304.9, 60: 238.2, 90: 174.8, 120: 147.1, 180: 105.8, 240: 85.3, 300: 72.3, 480: 48.6, 600: 41.8 },
+            "1.70": { 5: 1094.4, 10: 880.1, 15: 768.0, 20: 606.7, 30: 422.4, 45: 317.7, 60: 247.3, 90: 181.2, 120: 150.0, 180: 107.7, 240: 87.0, 300: 73.7, 480: 49.3, 600: 42.1 },
+            "1.67": { 5: 1140.0, 10: 916.8, 15: 800.0, 20: 632.0, 30: 440.0, 45: 324.6, 60: 248.6, 90: 185.0, 120: 152.9, 180: 109.6, 240: 87.8, 300: 74.4, 480: 49.8, 600: 42.7 },
+            "1.60": { 5: 1156.0, 10: 929.6, 15: 811.2, 20: 640.8, 30: 446.2, 45: 329.5, 60: 251.4, 90: 189.9, 120: 155.0, 180: 111.8, 240: 89.5, 300: 75.5, 480: 49.9, 600: 42.8 }
+        },
+        constantCurrentTable: {
+            "1.85": { 5: 478.6, 10: 382.1, 15: 331.3, 20: 260.5, 30: 180.5, 45: 142.6, 60: 115.6, 90: 84.9, 120: 69.4, 180: 51.7, 240: 40.9, 300: 34.6, 480: 23.9, 600: 20.4 },
+            "1.80": { 5: 544.2, 10: 433.7, 15: 375.4, 20: 294.5, 30: 203.6, 45: 151.5, 60: 119.5, 90: 87.4, 120: 73.5, 180: 53.4, 240: 42.4, 300: 35.9, 480: 24.4, 600: 21.0 },
+            "1.75": { 5: 581.1, 10: 462.3, 15: 399.4, 20: 312.5, 30: 215.2, 45: 160.6, 60: 124.4, 90: 91.0, 120: 76.3, 180: 54.5, 240: 43.8, 300: 37.0, 480: 24.6, 600: 21.1 },
+            "1.70": { 5: 616.6, 10: 489.2, 15: 421.1, 20: 328.9, 30: 226.4, 45: 168.5, 60: 129.8, 90: 94.8, 120: 78.1, 180: 55.7, 240: 44.8, 300: 37.8, 480: 25.0, 600: 21.2 },
+            "1.67": { 5: 654.0, 10: 517.3, 15: 444.2, 20: 346.3, 30: 237.6, 45: 173.1, 60: 131.2, 90: 97.3, 120: 80.0, 180: 57.0, 240: 45.4, 300: 38.3, 480: 25.3, 600: 21.6 },
+            "1.60": { 5: 677.2, 10: 535.0, 15: 458.0, 20: 355.2, 30: 243.4, 45: 177.4, 60: 133.6, 90: 100.6, 120: 81.6, 180: 58.4, 240: 46.5, 300: 39.1, 480: 25.4, 600: 21.7 }
+        }
+    }
+];
+const LEAD_ACID_MODEL_MAP = {};
+LEAD_ACID_MODELS.forEach(m => { LEAD_ACID_MODEL_MAP[m.id] = m; });
 
 // ══════════════════════════════════════════════════════════════════
 // ENGINE
@@ -3647,6 +4096,9 @@ function recalculate() {
     if (typeof updateAcRecommendation === 'function') {
         updateAcRecommendation(inputs);
     }
+    if (typeof updateComparisonSection === 'function') {
+        updateComparisonSection(inputs, r, capResult, dcResult);
+    }
 }
 
 function detailRow(label, value) {
@@ -5227,6 +5679,7 @@ function saveCurrentConfig() {
     list.unshift({ id: 'cfg_' + Date.now(), name: kva + ' kVA', savedAt: new Date().toISOString(), values: values });
     persistSavedConfigs(list);
     renderSavedConfigs();
+if (typeof initComparisonEvents === 'function') initComparisonEvents();
 }
 function deleteSavedConfig(id) {
     persistSavedConfigs(loadSavedConfigs().filter(c => c.id !== id));
@@ -5280,6 +5733,573 @@ document.getElementById('savedConfigsList').addEventListener('click', function (
     const card = e.target.closest('[data-config-id]');
     if (card) applySavedConfig(card.dataset.configId);
 });
+
+
+// ══════════════════════════════════════════════════════════════════
+// LEAD-ACID BENCHMARK ENGINE & COMPARISON MODULE
+// ══════════════════════════════════════════════════════════════════
+let cmpLeadAcidModelId = null; // null => auto-follow Zn-Ni selection
+let cmpLeadAcidEpv = 1.67;
+let cmpManualSeriesBlocks = null;
+let cmpManualParallelStrings = null;
+let lastComparisonResult = null;
+
+function getLeadAcidDefaultModelId(znNiModelId) {
+    return znNiModelId === '8XNFZ38' ? 'LHR12400W' : 'LHR12800W';
+}
+
+function znResultVoltages(znNiResult, inputs, znTotalCells) {
+    const temp = inputs.temperature ?? 25;
+    const tcvCell = TCV_CELL_25C - TCV_TEMP_COEF_CELL * (temp - 25);
+    const floatCell = tcvCell - FLOAT_OFFSET_CELL;
+    if (znNiResult && Number.isFinite(znNiResult.configFloatVoltage) && Number.isFinite(znNiResult.configEqualizeVoltage)) {
+        return {
+            floatVolt: znNiResult.configFloatVoltage,
+            equalizeVolt: znNiResult.configEqualizeVoltage
+        };
+    }
+    return {
+        floatVolt: znTotalCells * floatCell,
+        equalizeVolt: znTotalCells * tcvCell
+    };
+}
+
+function calculateLeadAcidComparison(inputs, znNiResult, customOptions = {}) {
+    const znNiModelId = inputs.batteryModelId || '8XNFG90';
+    const znNiModel = BATTERY_MODEL_MAP[znNiModelId] || BATTERY_MODELS[0];
+    
+    // 1. Select Lead-Acid Model (auto-mapped or manual)
+    const laModelId = customOptions.leadAcidModelId || cmpLeadAcidModelId || getLeadAcidDefaultModelId(znNiModelId);
+    const laModel = LEAD_ACID_MODEL_MAP[laModelId] || LEAD_ACID_MODELS[0];
+    
+    // 2. Bus Voltage System
+    const isDc = (typeof calcMode !== 'undefined' && calcMode === 'dc');
+    const vNom = isDc ? (inputs.dcSystemVoltage || 110) : (inputs.systemVoltage || 480);
+    const vMin = isDc 
+        ? inputs.dcVoltMin 
+        : (Number.isFinite(inputs.upsVoltageLower) ? inputs.upsVoltageLower : vNom * (1 - (inputs.voltageRangePercent || 20) / 100));
+    const vMax = isDc 
+        ? inputs.dcVoltMax 
+        : (Number.isFinite(inputs.upsVoltageUpper) ? inputs.upsVoltageUpper : vNom * (1 + (inputs.voltageRangePercent || 20) / 100));
+    
+    // 3. Series Blocks & Cell Count
+    let defaultSeries = Math.max(1, Math.round(vNom / 12));
+    // If bus lower voltage is constrained, check if defaultSeries allows reaching vMin
+    if (vMin > 0 && (defaultSeries * 6 * 1.85) < vMin) {
+        const minSeriesForVmin = Math.ceil(vMin / (6 * 1.85));
+        if (minSeriesForVmin * 6 * 2.25 <= (vMax || 9999)) {
+            defaultSeries = minSeriesForVmin;
+        }
+    }
+    const seriesBlocks = (customOptions.manualSeriesBlocks > 0) ? parseInt(customOptions.manualSeriesBlocks) : defaultSeries;
+    const cellsPerString = seriesBlocks * 6;
+    
+    // 4. Cutoff Voltage & Bus Floor Check
+    const availableEpvKeys = Object.keys(laModel.dischargeTable).map(Number).sort((a, b) => a - b);
+    const reqEpvFloor = cellsPerString > 0 ? (vMin / cellsPerString) : 0;
+    const requestedEpv = parseFloat(customOptions.leadAcidEpv !== undefined ? customOptions.leadAcidEpv : cmpLeadAcidEpv) || 1.67;
+    
+    let effectiveEpv = requestedEpv;
+    let autoMatchedEpv = false;
+    let epvNotice = '';
+    
+    if (effectiveEpv < reqEpvFloor - 1e-9) {
+        const higherKeys = availableEpvKeys.filter(k => k >= reqEpvFloor - 1e-9);
+        if (higherKeys.length > 0) {
+            effectiveEpv = higherKeys[0];
+            autoMatchedEpv = true;
+            epvNotice = (typeof currentLang !== 'undefined' && currentLang === 'en')
+                ? `Bus floor requires cell cutoff ≥ ${reqEpvFloor.toFixed(2)}V/cell, auto-matched to ${effectiveEpv.toFixed(2)}V/cell`
+                : `母线下限要求单体截止电压 ≥ ${reqEpvFloor.toFixed(2)}V/cell，已自动向上适配为 ${effectiveEpv.toFixed(2)}V/cell 档位`;
+        } else {
+            effectiveEpv = availableEpvKeys[availableEpvKeys.length - 1];
+            epvNotice = (typeof currentLang !== 'undefined' && currentLang === 'en')
+                ? `Bus floor cutoff (${reqEpvFloor.toFixed(2)}V/cell) exceeds VRLA table max (${effectiveEpv.toFixed(2)}V/cell)`
+                : `母线下限折算截止电压 (${reqEpvFloor.toFixed(2)}V/cell) 超出铅酸放电表最高档 (${effectiveEpv.toFixed(2)}V/cell)`;
+        }
+    }
+    const effectiveEpvKey = effectiveEpv.toFixed(2);
+    
+    // 5. Voltage Boundary Values
+    const nominalVoltage = seriesBlocks * laModel.specs.ratedVoltage;
+    const floatVoltage = cellsPerString * laModel.specs.nominalFloatVcell; // 2.275V
+    const equalizeVoltage = cellsPerString * laModel.specs.nominalEqualizeVcell; // 2.35V
+    const cutoffVoltage = cellsPerString * effectiveEpv;
+    
+    const floatWithinBus = floatVoltage <= (vMax + 1e-9);
+    const equalizeWithinBus = equalizeVoltage <= (vMax + 1e-9);
+    const cutoffWithinBus = cutoffVoltage >= (vMin - 1e-9);
+    
+    // 6. Required Power/Current & Parallel Strings Sizing
+    let requiredStrings = 1;
+    let fulfillmentRatio = 1.0;
+    let requiredLoadDesc = '';
+    let availLoadDesc = '';
+    
+    const isAcDuty = (!isDc && typeof acLoadMode !== 'undefined' && acLoadMode === 'duty' && Array.isArray(inputs.dutySteps) && inputs.dutySteps.length > 0);
+    const isDcDuty = (isDc && typeof dcLoadMode !== 'undefined' && dcLoadMode === 'duty' && typeof dcDutyCycleList !== 'undefined' && Array.isArray(dcDutyCycleList) && dcDutyCycleList.length > 0);
+    
+    if (isAcDuty) {
+        // Multi-stage AC duty cycle with IEEE 485 section method
+        const cpRow = laModel.dischargeTable[effectiveEpvKey] || laModel.dischargeTable['1.67'];
+        const section = sizeDutyBySection(inputs.dutySteps, cpRow);
+        const reqUnits = section ? section.requiredUnits : 1;
+        requiredStrings = Math.max(1, Math.ceil(reqUnits / cellsPerString));
+        const chosenStrings = (customOptions.manualParallelStrings > 0) ? parseInt(customOptions.manualParallelStrings) : requiredStrings;
+        const totalCells = cellsPerString * chosenStrings;
+        fulfillmentRatio = reqUnits > 0 ? (totalCells / reqUnits) : 1;
+        requiredLoadDesc = `IEEE 485 分段法需 ${reqUnits.toFixed(1)} 节`;
+        availLoadDesc = `配置 ${totalCells} 节 (${chosenStrings} 组并联)`;
+    } else if (isDcDuty) {
+        // Multi-stage DC duty cycle
+        const ccRow = laModel.constantCurrentTable[effectiveEpvKey] || laModel.constantCurrentTable['1.67'];
+        const section = sizeDutyBySection(dcDutyCycleList, ccRow);
+        const reqStrings = section ? section.requiredUnits : 1;
+        requiredStrings = Math.max(1, Math.ceil(reqStrings));
+        const chosenStrings = (customOptions.manualParallelStrings > 0) ? parseInt(customOptions.manualParallelStrings) : requiredStrings;
+        fulfillmentRatio = reqStrings > 0 ? (chosenStrings / reqStrings) : 1;
+        requiredLoadDesc = `IEEE 485 分段法需 ${reqStrings.toFixed(2)} 组`;
+        availLoadDesc = `配置 ${chosenStrings} 组并联`;
+    } else if (isDc) {
+        // DC Constant Load
+        const ccRow = laModel.constantCurrentTable[effectiveEpvKey] || laModel.constantCurrentTable['1.67'];
+        const durationMin = inputs.dcConstTimeMin || inputs.backupTimeMin || 60;
+        const look = lookupCapability(ccRow, durationMin);
+        const availAperString = look.value;
+        
+        let requiredTotalA = 0;
+        if (znNiResult && Number.isFinite(znNiResult.adjustedContCurrentA)) {
+            requiredTotalA = znNiResult.adjustedContCurrentA;
+        } else {
+            const val = inputs.dcConstLoadValue || 10;
+            const unit = inputs.dcConstLoadUnit || 'A';
+            const afMult = getFactorMultiplier(inputs.agingFactor);
+            const dmMult = getFactorMultiplier(inputs.designMargin);
+            requiredTotalA = (unit === 'kW' ? (val * 1000 / vMin) : val) * afMult * dmMult;
+        }
+        requiredStrings = availAperString > 0 ? Math.max(1, Math.ceil(requiredTotalA / availAperString)) : 1;
+        const chosenStrings = (customOptions.manualParallelStrings > 0) ? parseInt(customOptions.manualParallelStrings) : requiredStrings;
+        const availTotalA = availAperString * chosenStrings;
+        fulfillmentRatio = requiredTotalA > 0 ? (availTotalA / requiredTotalA) : 1;
+        requiredLoadDesc = `${requiredTotalA.toFixed(1)} A`;
+        availLoadDesc = `${availTotalA.toFixed(1)} A (${availAperString.toFixed(1)} A/串 × ${chosenStrings}组)`;
+    } else {
+        // AC Constant Power
+        const cpRow = laModel.dischargeTable[effectiveEpvKey] || laModel.dischargeTable['1.67'];
+        const durationMin = inputs.backupTimeMin || 15;
+        const look = lookupCapability(cpRow, durationMin);
+        const availWperCell = look.value;
+        
+        let requiredTotalW = 0;
+        if (znNiResult && Number.isFinite(znNiResult.requiredPowerW)) {
+            requiredTotalW = znNiResult.requiredPowerW;
+        } else {
+            const afMult = getFactorMultiplier(inputs.agingFactor);
+            const dmMult = getFactorMultiplier(inputs.designMargin);
+            requiredTotalW = (inputs.upsRatingKva * 1000 * (inputs.powerFactor || 0.9) / (inputs.inverterEfficiency || 0.95)) * afMult * dmMult;
+        }
+        
+        const reqWperCell1String = cellsPerString > 0 ? (requiredTotalW / cellsPerString) : requiredTotalW;
+        requiredStrings = availWperCell > 0 ? Math.max(1, Math.ceil(reqWperCell1String / availWperCell)) : 1;
+        const chosenStrings = (customOptions.manualParallelStrings > 0) ? parseInt(customOptions.manualParallelStrings) : requiredStrings;
+        const availTotalW = availWperCell * cellsPerString * chosenStrings;
+        fulfillmentRatio = requiredTotalW > 0 ? (availTotalW / requiredTotalW) : 1;
+        requiredLoadDesc = `${(requiredTotalW / 1000).toFixed(1)} kW`;
+        availLoadDesc = `${(availTotalW / 1000).toFixed(1)} kW (${availWperCell.toFixed(1)} W/cell × ${cellsPerString * chosenStrings}节)`;
+    }
+    
+    const chosenStrings = (customOptions.manualParallelStrings > 0) ? parseInt(customOptions.manualParallelStrings) : requiredStrings;
+    const totalBlocks = seriesBlocks * chosenStrings;
+    const totalCells = cellsPerString * chosenStrings;
+    
+    // 7. Lead-Acid Physical Metrics
+    const laTotalWeight = totalBlocks * laModel.specs.weightKg;
+    const laTotalVolume = totalBlocks * laModel.specs.volumeL;
+    
+    // 8. Zn-Ni Physical Metrics
+    let znBlocksPerGroup = inputs.blocksPerGroup || Math.ceil((inputs.cellsPerString || 0) / 8);
+    let znStrings = inputs.numberOfStrings || 1;
+    let znTotalBlocks = znBlocksPerGroup * znStrings;
+    let znTotalCells = znTotalBlocks * 8;
+    let znSatisfaction = 1.0;
+    
+    if (znNiResult) {
+        if (Number.isFinite(znNiResult.totalQuantity)) znTotalBlocks = znNiResult.totalQuantity;
+        if (Number.isFinite(znNiResult.satisfactionRatio)) znSatisfaction = znNiResult.satisfactionRatio;
+        else if (Number.isFinite(znNiResult.currentSatRatio)) znSatisfaction = znNiResult.currentSatRatio;
+    }
+    
+    const znUnitWeight = znNiModel.specs.officialWeightKg || znNiModel.specs.weightKg || 7.8;
+    const znUnitVolume = znNiModel.specs.volumeL || 3.88;
+    const znTotalWeight = znTotalBlocks * znUnitWeight;
+    const znTotalVolume = znTotalBlocks * znUnitVolume;
+    
+    const znNominalVolt = znBlocksPerGroup * (znNiModel.specs.ratedVoltage || 13.2);
+    const znVoltages = znResultVoltages(znNiResult, inputs, znTotalCells);
+    const znFloatVolt = znVoltages.floatVolt;
+    const znEqualizeVolt = znVoltages.equalizeVolt;
+    const znCutoffVolt = znBlocksPerGroup * 8 * (inputs.epv || 1.30);
+    
+    // 9. Comparison & Savings
+    const blockSaved = totalBlocks - znTotalBlocks;
+    const blockSavedPct = totalBlocks > 0 ? ((blockSaved / totalBlocks) * 100) : 0;
+    
+    const weightSavedKg = laTotalWeight - znTotalWeight;
+    const weightSavedPct = laTotalWeight > 0 ? ((weightSavedKg / laTotalWeight) * 100) : 0;
+    const weightRatio = znTotalWeight > 0 ? (laTotalWeight / znTotalWeight) : 1;
+    
+    const volSavedL = laTotalVolume - znTotalVolume;
+    const volSavedPct = laTotalVolume > 0 ? ((volSavedL / laTotalVolume) * 100) : 0;
+    const volRatio = znTotalVolume > 0 ? (laTotalVolume / znTotalVolume) : 1;
+    
+    return {
+        isDc,
+        znNi: {
+            model: znNiModel,
+            modelId: znNiModelId,
+            seriesBlocks: znBlocksPerGroup,
+            parallelStrings: znStrings,
+            totalBlocks: znTotalBlocks,
+            totalCells: znTotalCells,
+            unitWeight: znUnitWeight,
+            unitVolume: znUnitVolume,
+            totalWeight: znTotalWeight,
+            totalVolume: znTotalVolume,
+            satisfactionPct: znSatisfaction * 100,
+            nominalVolt: znNominalVolt,
+            floatVolt: znFloatVolt,
+            equalizeVolt: znEqualizeVolt,
+            cutoffVolt: znCutoffVolt
+        },
+        leadAcid: {
+            model: laModel,
+            modelId: laModelId,
+            seriesBlocks,
+            defaultSeries,
+            parallelStrings: chosenStrings,
+            recommendedStrings: requiredStrings,
+            totalBlocks,
+            totalCells,
+            unitWeight: laModel.specs.weightKg,
+            unitVolume: laModel.specs.volumeL,
+            totalWeight: laTotalWeight,
+            totalVolume: laTotalVolume,
+            satisfactionPct: fulfillmentRatio * 100,
+            requestedEpv,
+            effectiveEpv,
+            effectiveEpvKey,
+            autoMatchedEpv,
+            epvNotice,
+            nominalVolt: nominalVoltage,
+            floatVolt: floatVoltage,
+            equalizeVolt: equalizeVoltage,
+            cutoffVolt: cutoffVoltage,
+            floatWithinBus,
+            equalizeWithinBus,
+            cutoffWithinBus,
+            requiredLoadDesc,
+            availLoadDesc
+        },
+        savings: {
+            blockSaved,
+            blockSavedPct,
+            weightSavedKg,
+            weightSavedPct,
+            weightRatio,
+            volSavedL,
+            volSavedPct,
+            volRatio
+        }
+    };
+}
+
+function updateComparisonSection(inputs, r, capResult, dcResult) {
+    const sec = document.getElementById('batteryComparisonSection');
+    if (!sec) return;
+    
+    const activeResult = (typeof calcMode !== 'undefined' && calcMode === 'dc') 
+        ? dcResult 
+        : ((typeof calcMode !== 'undefined' && calcMode === 'capacity') ? capResult : r);
+        
+    const res = calculateLeadAcidComparison(inputs, activeResult, {
+        leadAcidModelId: cmpLeadAcidModelId,
+        leadAcidEpv: cmpLeadAcidEpv,
+        manualSeriesBlocks: cmpManualSeriesBlocks,
+        manualParallelStrings: cmpManualParallelStrings
+    });
+    lastComparisonResult = res;
+    
+    const isEn = (typeof currentLang !== 'undefined' && currentLang === 'en');
+    const zn = res.znNi;
+    const la = res.leadAcid;
+    const sav = res.savings;
+    
+    // Sync model dropdown
+    const modelSel = document.getElementById('cmpLeadAcidModelSelect');
+    if (modelSel && modelSel.value !== la.modelId) modelSel.value = la.modelId;
+    
+    // Sync EPV dropdown
+    const epvSel = document.getElementById('cmpLeadAcidEpvSelect');
+    if (epvSel && epvSel.value !== cmpLeadAcidEpv.toFixed(2)) epvSel.value = cmpLeadAcidEpv.toFixed(2);
+    
+    // Sync Series/Parallel inputs if user not actively editing
+    const sInp = document.getElementById('cmpLaSeriesBlocks');
+    if (sInp && document.activeElement !== sInp) sInp.value = la.seriesBlocks;
+    const pInp = document.getElementById('cmpLaParallelStrings');
+    if (pInp && document.activeElement !== pInp) pInp.value = la.parallelStrings;
+    
+    // Pairing indicator
+    const pZn = document.getElementById('cmpZnNiPairName');
+    if (pZn) pZn.textContent = `${zn.model.id} (${zn.model.specs.label})`;
+    const pLa = document.getElementById('cmpLaPairName');
+    if (pLa) pLa.textContent = isEn ? la.model.nameEn : la.model.nameZh;
+    
+    // Notice
+    const notEl = document.getElementById('cmpAutoEpvNotice');
+    const notTxt = document.getElementById('cmpAutoEpvNoticeText');
+    if (notEl && notTxt) {
+        if (la.epvNotice) {
+            notEl.classList.remove('hidden');
+            notTxt.textContent = la.epvNotice;
+        } else if (!la.cutoffWithinBus) {
+            notEl.classList.remove('hidden');
+            notTxt.textContent = isEn 
+                ? `VRLA cutoff (${la.cutoffVolt.toFixed(1)}V) is lower than bus min (${(inputs.upsVoltageLower || inputs.dcVoltMin || 0).toFixed(1)}V)`
+                : `铅酸截止母线 (${la.cutoffVolt.toFixed(1)}V) 低于母线允许下限 (${(inputs.upsVoltageLower || inputs.dcVoltMin || 0).toFixed(1)}V)`;
+        } else {
+            notEl.classList.add('hidden');
+        }
+    }
+    
+    // Zn-Ni Top Numbers
+    const znBlocks = document.getElementById('cmpZnTotalBlocks');
+    if (znBlocks) znBlocks.textContent = zn.totalBlocks;
+    const znDesc = document.getElementById('cmpZnTopologyDesc');
+    if (znDesc) znDesc.textContent = isEn 
+        ? `${zn.seriesBlocks}S × ${zn.parallelStrings}P (${zn.totalCells} cells)`
+        : `${zn.seriesBlocks} 串 × ${zn.parallelStrings} 并 (${zn.totalCells} 节)`;
+        
+    const badgeSav = document.getElementById('cmpBlockSavingBadge');
+    if (badgeSav) {
+        if (sav.blockSaved > 0) {
+            badgeSav.className = 'badge text-xs font-black tracking-wide bg-ok/25 text-ok';
+            badgeSav.textContent = isEn 
+                ? `Save ${sav.blockSavedPct.toFixed(1)}% Blocks (-${sav.blockSaved})`
+                : `节省 ${sav.blockSavedPct.toFixed(1)}% 数量 (减少 ${sav.blockSaved} 块)`;
+        } else if (sav.blockSaved === 0) {
+            badgeSav.className = 'badge text-xs font-semibold bg-line/80 text-ink2';
+            badgeSav.textContent = isEn ? 'Equal Block Count' : '数量相当 (同量级)';
+        } else {
+            badgeSav.className = 'badge text-xs font-semibold bg-amber-500/20 text-amber-400';
+            badgeSav.textContent = isEn 
+                ? `+${Math.abs(sav.blockSaved)} Blocks (High Power Units)`
+                : `多 ${Math.abs(sav.blockSaved)} 块 (高功率单体配置)`;
+        }
+    }
+    
+    // Zn-Ni Weight & Volume & Sat & Volt
+    const znW = document.getElementById('cmpZnTotalWeight');
+    if (znW) znW.textContent = fmt(zn.totalWeight, 1) + ' kg';
+    const znWSav = document.getElementById('cmpWeightSavingBadge');
+    if (znWSav) {
+        znWSav.textContent = sav.weightSavedKg > 0 ? (isEn ? `-${sav.weightSavedPct.toFixed(1)}%` : `减重 ${sav.weightSavedPct.toFixed(1)}%`) : '—';
+        znWSav.style.display = sav.weightSavedKg > 0 ? '' : 'none';
+    }
+    const znWPer = document.getElementById('cmpZnWeightPerUnit');
+    if (znWPer) znWPer.textContent = isEn ? `Per Block ${zn.unitWeight} kg` : `单块 ${zn.unitWeight} kg`;
+    const znWDiff = document.getElementById('cmpWeightSavedKg');
+    if (znWDiff) znWDiff.textContent = sav.weightSavedKg > 0 
+        ? (isEn ? `Save ${fmt(sav.weightSavedKg, 1)} kg` : `减轻 ${fmt(sav.weightSavedKg, 1)} kg`)
+        : '';
+    const znWBar = document.getElementById('cmpZnWeightBar');
+    if (znWBar) {
+        const maxW = Math.max(zn.totalWeight, la.totalWeight, 1);
+        znWBar.style.width = Math.min(100, Math.max(6, (zn.totalWeight / maxW) * 100)) + '%';
+    }
+    
+    // Zn-Ni Volume
+    const znV = document.getElementById('cmpZnTotalVol');
+    if (znV) znV.textContent = fmt(zn.totalVolume, 1) + ' L';
+    const znVSav = document.getElementById('cmpVolSavingBadge');
+    if (znVSav) {
+        znVSav.textContent = sav.volSavedL > 0 ? (isEn ? `-${sav.volSavedPct.toFixed(1)}%` : `省空间 ${sav.volSavedPct.toFixed(1)}%`) : '—';
+        znVSav.style.display = sav.volSavedL > 0 ? '' : 'none';
+    }
+    const znVPer = document.getElementById('cmpZnVolPerUnit');
+    if (znVPer) znVPer.textContent = isEn ? `Per Block ${zn.unitVolume} L` : `单块 ${zn.unitVolume} L`;
+    const znVDiff = document.getElementById('cmpVolSavedL');
+    if (znVDiff) znVDiff.textContent = sav.volSavedL > 0 
+        ? (isEn ? `Save ${fmt(sav.volSavedL, 1)} L` : `节省 ${fmt(sav.volSavedL, 1)} L`)
+        : '';
+    const znVBar = document.getElementById('cmpZnVolBar');
+    if (znVBar) {
+        const maxV = Math.max(zn.totalVolume, la.totalVolume, 1);
+        znVBar.style.width = Math.min(100, Math.max(6, (zn.totalVolume / maxV) * 100)) + '%';
+    }
+    
+    // Zn-Ni Fulfillment & Volt
+    const znSat = document.getElementById('cmpZnSatisfaction');
+    if (znSat) {
+        znSat.textContent = zn.satisfactionPct.toFixed(1) + '%';
+        znSat.className = 'font-mono font-bold text-sm ' + (zn.satisfactionPct >= 100 ? 'text-ok' : 'text-bad');
+    }
+    const znSatBar = document.getElementById('cmpZnSatBar');
+    if (znSatBar) {
+        znSatBar.style.width = Math.min(100, zn.satisfactionPct) + '%';
+        znSatBar.className = 'h-full rounded-full transition-all duration-500 ' + (zn.satisfactionPct >= 100 ? 'bg-ok' : 'bg-bad');
+    }
+    const znSatCap = document.getElementById('cmpZnSatCap');
+    if (znSatCap) {
+        znSatCap.textContent = zn.satisfactionPct >= 100 
+            ? (isEn ? `Margin +${(zn.satisfactionPct - 100).toFixed(1)}%` : `裕度 +${(zn.satisfactionPct - 100).toFixed(1)}%`)
+            : (isEn ? 'Deficit' : '欠配告警');
+    }
+    
+    const znNom = document.getElementById('cmpZnNomVolt');
+    if (znNom) znNom.textContent = fmt(zn.nominalVolt, 1) + ' V';
+    const znChg = document.getElementById('cmpZnChgVolt');
+    if (znChg) znChg.textContent = `${fmt(zn.floatVolt, 1)} V / ${fmt(zn.equalizeVolt, 1)} V`;
+    const znCut = document.getElementById('cmpZnCutoffVolt');
+    if (znCut) znCut.textContent = fmt(zn.cutoffVolt, 1) + ' V';
+    
+    // ── Lead-Acid Column ──
+    const laBlocks = document.getElementById('cmpLaTotalBlocks');
+    if (laBlocks) laBlocks.textContent = la.totalBlocks;
+    const laDesc = document.getElementById('cmpLaTopologyDesc');
+    if (laDesc) laDesc.textContent = isEn 
+        ? `${la.seriesBlocks}S × ${la.parallelStrings}P (${la.totalCells} cells)`
+        : `${la.seriesBlocks} 串 × ${la.parallelStrings} 并 (${la.totalCells} 节)`;
+        
+    const laW = document.getElementById('cmpLaTotalWeight');
+    if (laW) laW.textContent = fmt(la.totalWeight, 1) + ' kg';
+    const laWPer = document.getElementById('cmpLaWeightPerUnit');
+    if (laWPer) laWPer.textContent = isEn 
+        ? `Per Block ${la.unitWeight} kg (${(la.unitWeight / zn.unitWeight).toFixed(1)}x heavier)`
+        : `单块 ${la.unitWeight} kg (单块重约 ${(la.unitWeight / zn.unitWeight).toFixed(1)} 倍)`;
+    const laWRatio = document.getElementById('cmpLaWeightRatioDesc');
+    if (laWRatio) laWRatio.textContent = sav.weightRatio > 1 
+        ? (isEn ? `Total ${sav.weightRatio.toFixed(1)}x heavier` : `总重大约是锌镍的 ${sav.weightRatio.toFixed(1)} 倍`)
+        : '';
+    const laWBar = document.getElementById('cmpLaWeightBar');
+    if (laWBar) {
+        const maxW = Math.max(zn.totalWeight, la.totalWeight, 1);
+        laWBar.style.width = Math.min(100, Math.max(6, (la.totalWeight / maxW) * 100)) + '%';
+    }
+    
+    const laV = document.getElementById('cmpLaTotalVol');
+    if (laV) laV.textContent = fmt(la.totalVolume, 1) + ' L';
+    const laVPer = document.getElementById('cmpLaVolPerUnit');
+    if (laVPer) laVPer.textContent = isEn 
+        ? `Per Block ${la.unitVolume} L (${(la.unitVolume / zn.unitVolume).toFixed(1)}x bulkier)`
+        : `单块 ${la.unitVolume} L (单块体积约 ${(la.unitVolume / zn.unitVolume).toFixed(1)} 倍)`;
+    const laVRatio = document.getElementById('cmpLaVolRatioDesc');
+    if (laVRatio) laVRatio.textContent = sav.volRatio > 1 
+        ? (isEn ? `Total ${sav.volRatio.toFixed(1)}x larger volume` : `总体积约是锌镍的 ${sav.volRatio.toFixed(1)} 倍`)
+        : '';
+    const laVBar = document.getElementById('cmpLaVolBar');
+    if (laVBar) {
+        const maxV = Math.max(zn.totalVolume, la.totalVolume, 1);
+        laVBar.style.width = Math.min(100, Math.max(6, (la.totalVolume / maxV) * 100)) + '%';
+    }
+    
+    const laSat = document.getElementById('cmpLaSatisfaction');
+    if (laSat) {
+        laSat.textContent = la.satisfactionPct.toFixed(1) + '%';
+        laSat.className = 'font-mono font-bold text-sm ' + (la.satisfactionPct >= 100 ? 'text-ok' : 'text-bad');
+    }
+    const laSatBar = document.getElementById('cmpLaSatBar');
+    if (laSatBar) {
+        laSatBar.style.width = Math.min(100, la.satisfactionPct) + '%';
+        laSatBar.className = 'h-full rounded-full transition-all duration-500 ' + (la.satisfactionPct >= 100 ? 'bg-amber-500' : 'bg-bad');
+    }
+    const laSatDesc = document.getElementById('cmpLaSatDesc');
+    if (laSatDesc) {
+        laSatDesc.textContent = la.satisfactionPct >= 100 
+            ? (isEn ? '✓ Satisfied (≥100%)' : '✓ 满足工况 (≥100%)')
+            : (isEn ? '✗ Insufficient' : '✗ 欠配需增加组数');
+    }
+    const laSatCap = document.getElementById('cmpLaSatCap');
+    if (laSatCap) {
+        laSatCap.textContent = la.availLoadDesc || '';
+    }
+    
+    const laNom = document.getElementById('cmpLaNomVolt');
+    if (laNom) laNom.textContent = fmt(la.nominalVolt, 1) + ' V';
+    const laChg = document.getElementById('cmpLaChgVolt');
+    if (laChg) laChg.textContent = `${fmt(la.floatVolt, 1)} V / ${fmt(la.equalizeVolt, 1)} V`;
+    const laCut = document.getElementById('cmpLaCutoffVolt');
+    if (laCut) laCut.textContent = `${fmt(la.cutoffVolt, 1)} V (@ ${la.effectiveEpvKey}V/cell)`;
+}
+
+function initComparisonEvents() {
+    const modelSel = document.getElementById('cmpLeadAcidModelSelect');
+    if (modelSel) {
+        modelSel.addEventListener('change', function () {
+            cmpLeadAcidModelId = this.value;
+            cmpManualSeriesBlocks = null;
+            cmpManualParallelStrings = null;
+            recalculate();
+        });
+    }
+    
+    const epvSel = document.getElementById('cmpLeadAcidEpvSelect');
+    if (epvSel) {
+        epvSel.addEventListener('change', function () {
+            cmpLeadAcidEpv = parseFloat(this.value) || 1.67;
+            recalculate();
+        });
+    }
+    
+    const sInp = document.getElementById('cmpLaSeriesBlocks');
+    if (sInp) {
+        sInp.addEventListener('input', function () {
+            const val = parseInt(this.value);
+            cmpManualSeriesBlocks = (val > 0) ? val : null;
+            recalculate();
+        });
+    }
+    
+    const pInp = document.getElementById('cmpLaParallelStrings');
+    if (pInp) {
+        pInp.addEventListener('input', function () {
+            const val = parseInt(this.value);
+            cmpManualParallelStrings = (val > 0) ? val : null;
+            recalculate();
+        });
+    }
+    
+    const rBtn = document.getElementById('cmpResetLaBtn');
+    if (rBtn) {
+        rBtn.addEventListener('click', function () {
+            cmpManualSeriesBlocks = null;
+            cmpManualParallelStrings = null;
+            cmpLeadAcidEpv = 1.67;
+            const epvEl = document.getElementById('cmpLeadAcidEpvSelect');
+            if (epvEl) epvEl.value = '1.67';
+            const mEl = document.getElementById('batteryModel');
+            if (mEl) {
+                cmpLeadAcidModelId = getLeadAcidDefaultModelId(mEl.value);
+                const laSel = document.getElementById('cmpLeadAcidModelSelect');
+                if (laSel) laSel.value = cmpLeadAcidModelId;
+            }
+            recalculate();
+        });
+    }
+    
+    // Auto-update benchmark lead-acid model when main battery model switches
+    const bModel = document.getElementById('batteryModel');
+    if (bModel) {
+        bModel.addEventListener('change', function () {
+            cmpLeadAcidModelId = getLeadAcidDefaultModelId(this.value);
+            const laSel = document.getElementById('cmpLeadAcidModelSelect');
+            if (laSel) laSel.value = cmpLeadAcidModelId;
+            cmpManualSeriesBlocks = null;
+            cmpManualParallelStrings = null;
+            recalculate();
+        });
+    }
+}
+
 </script>
 
 <script>
@@ -5293,6 +6313,49 @@ try { currentLang = localStorage.getItem(LANG_KEY) || 'zh'; } catch (e) {}
 const I18N = {
     zh: {
         app_title: 'Jayden的智能配置计算引擎',
+        cmp_title: 'UPS 备电方案同台对比 (Zn-Ni vs. Lead-Acid)',
+        cmp_subtitle: '在完全相同的系统母线电压、负载需求与备电时长下，对标行业高倍率铅酸方案',
+        cmp_badge: '同工况对标 Benchmark',
+        cmp_lbl_la_model: '铅酸对标:',
+        cmp_lbl_la_epv: '铅酸截止:',
+        cmp_lbl_la_topology: '串/并微调:',
+        cmp_unit_series: '串',
+        cmp_unit_parallel: '并',
+        cmp_btn_auto: '自动',
+        cmp_pair_lead: '当前对比组合:',
+        cmp_zn_card_title: '我方锌镍电池方案 (Zn-Ni)',
+        cmp_zn_badge: '🌟 推荐方案',
+        cmp_lbl_zn_blocks: '总块数 Total Blocks',
+        cmp_unit_blocks: '块',
+        cmp_lbl_zn_weight: '系统总重量',
+        cmp_lbl_zn_vol: '系统总体积',
+        cmp_lbl_zn_sat: '工况满足率',
+        cmp_lbl_zn_nom_volt: '标称总电压:',
+        cmp_lbl_zn_chg_volt: '浮充 / 均充电压:',
+        cmp_lbl_zn_cutoff_volt: '截止总电压:',
+        cmp_la_card_title: '传统高倍率铅酸方案 (VRLA)',
+        cmp_la_badge: '传统基准 Benchmark',
+        cmp_lbl_la_blocks: '总块数 Total Blocks',
+        cmp_la_blocks_badge: '对标配置',
+        cmp_lbl_la_weight: '系统总重量',
+        cmp_lbl_la_vol: '系统总体积',
+        cmp_lbl_la_sat: '工况满足率',
+        cmp_lbl_la_nom_volt: '标称总电压:',
+        cmp_lbl_la_chg_volt: '浮充 / 均充电压:',
+        cmp_lbl_la_cutoff_volt: '截止总电压:',
+        cmp_grid_title: '🏆 锌镍电池对比铅酸在 UPS 备电场景的核心价值矩阵 Core Value Matrix',
+        cmp_v1_title: '10C 超高倍率放电',
+        cmp_v1_desc: '支持高达 10C 持续大电流放电，无铅酸严重的 Peukert 容量打折；5~15min 短时备电以小安时胜任大安时铅酸。',
+        cmp_v1_footer: '✓ 无 Peukert 效应折损',
+        cmp_v2_title: '本征安全与消防过检',
+        cmp_v2_desc: '通过 UL9540A 权威测试，针刺短路不起火不爆炸；水性不可燃电解液；放电无开路故障模式。',
+        cmp_v2_footer: '✓ UL9540A 认证无热失控',
+        cmp_v3_title: '15年长寿命与低 TCO',
+        cmp_v3_desc: '15年设计寿命 + 500次 100% DOD 循环；深放电不硫化；机房全生命周期免换电池，总拥有成本大幅降低。',
+        cmp_v3_footer: '✓ 15年设计寿命免换新',
+        cmp_v4_title: '宽温适应与绿色节能',
+        cmp_v4_desc: '-20°C~55°C 宽温高效工作，耐高温特性允许调高机房空调设定温度，降低制冷 PUE；无重金属铅和强酸。',
+        cmp_v4_footer: '✓ -20°C~55°C 降低空调能耗',
         app_subtitle: 'Sizing Calculator — 基于手动配置的实时校验与满足率测算',
         ai_toggle: 'AI 辅助分析',
         tab_power: '<span>⚡</span> 功率验证模式',
@@ -5402,6 +6465,49 @@ const I18N = {
     },
     en: {
         app_title: "Jayden's Intelligent Sizing Engine",
+        cmp_title: 'UPS Sizing Comparison (Zn-Ni vs. Lead-Acid)',
+        cmp_subtitle: 'Side-by-side benchmark against high-rate VRLA under identical DC bus, load, and runtime',
+        cmp_badge: 'Benchmark',
+        cmp_lbl_la_model: 'Benchmark VRLA:',
+        cmp_lbl_la_epv: 'VRLA Cutoff:',
+        cmp_lbl_la_topology: 'Topology Tuning:',
+        cmp_unit_series: 'S',
+        cmp_unit_parallel: 'P',
+        cmp_btn_auto: 'Auto',
+        cmp_pair_lead: 'Active Comparison:',
+        cmp_zn_card_title: 'Our Zn-Ni Solution (Zn-Ni)',
+        cmp_zn_badge: '🌟 Recommended',
+        cmp_lbl_zn_blocks: 'Total Blocks',
+        cmp_unit_blocks: 'blocks',
+        cmp_lbl_zn_weight: 'Total System Weight',
+        cmp_lbl_zn_vol: 'Total System Volume',
+        cmp_lbl_zn_sat: 'Duty Satisfaction',
+        cmp_lbl_zn_nom_volt: 'Nominal Voltage:',
+        cmp_lbl_zn_chg_volt: 'Float / Equalize Voltage:',
+        cmp_lbl_zn_cutoff_volt: 'Cutoff Voltage:',
+        cmp_la_card_title: 'Benchmark High-Rate VRLA (Lead-Acid)',
+        cmp_la_badge: 'Benchmark',
+        cmp_lbl_la_blocks: 'Total Blocks',
+        cmp_la_blocks_badge: 'Benchmark Config',
+        cmp_lbl_la_weight: 'Total System Weight',
+        cmp_lbl_la_vol: 'Total System Volume',
+        cmp_lbl_la_sat: 'Duty Satisfaction',
+        cmp_lbl_la_nom_volt: 'Nominal Voltage:',
+        cmp_lbl_la_chg_volt: 'Float / Equalize Voltage:',
+        cmp_lbl_la_cutoff_volt: 'Cutoff Voltage:',
+        cmp_grid_title: '🏆 Core Value Matrix: Zn-Ni vs. Lead-Acid in UPS Applications',
+        cmp_v1_title: '10C Ultra-High Discharge Rate',
+        cmp_v1_desc: 'Supports up to 10C continuous discharge without Peukert capacity loss; replaces large-Ah lead-acid with small-Ah in 5-15m short backups.',
+        cmp_v1_footer: '✓ Zero Peukert Capacity Loss',
+        cmp_v2_title: 'Intrinsic Safety & Fire Compliance',
+        cmp_v2_desc: 'Certified under UL9540A testing with zero thermal runaway, fire or explosion; water-based electrolyte with zero open-circuit failure mode.',
+        cmp_v2_footer: '✓ UL9540A Certified No Thermal Runaway',
+        cmp_v3_title: '15-Year Life & Low TCO',
+        cmp_v3_desc: '15-year design life + 500 cycles (100% DOD); no sulfation; eliminates mid-lifecycle battery replacements to slash overall TCO.',
+        cmp_v3_footer: '✓ 15-Yr Design Life / No Mid Replacement',
+        cmp_v4_title: 'Wide Temp & Energy Saving',
+        cmp_v4_desc: '-20°C~55°C wide operating range enables higher datacenter thermostat setpoints, reducing HVAC PUE; lead-free and acid-free.',
+        cmp_v4_footer: '✓ -20°C~55°C Lowers HVAC Energy',
         app_subtitle: 'Ni-Zn Battery Sizing Calculator — Real-time Verification & Satisfaction Estimation',
         ai_toggle: 'AI Analysis',
         tab_power: '<span>⚡</span> Power Mode',
