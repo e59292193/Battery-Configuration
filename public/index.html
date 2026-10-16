@@ -516,6 +516,42 @@
 .cmp-controls{display:grid;grid-template-columns:2fr 1.3fr 1fr 1fr auto;align-items:end;gap:12px}.cmp-controls>*{min-width:0}.cmp-controls label{display:block;font-size:12px;color:rgb(var(--c-text-2));margin-bottom:6px}.cmp-controls input,.cmp-controls select,.cmp-controls button{width:100%;min-height:44px;border:1px solid rgb(var(--c-border));border-radius:6px;background:rgb(var(--c-bg));padding:8px;color:rgb(var(--c-text));font:inherit;font-size:14px}.cmp-controls button{cursor:pointer;background:rgb(var(--c-elevated));font-weight:600}.cmp-controls :is(input,select,button):focus-visible,.cmp-details summary:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:3px}.cmp-control-note{font-size:12px;margin:12px 0 24px}.cmp-schemes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:24px}.cmp-scheme{padding:16px;border:1px solid rgb(var(--c-border));border-top:3px solid rgb(var(--c-accent));border-radius:8px;min-width:0}.cmp-scheme:first-child{border-top-color:#389e99}.cmp-scheme h4{font-size:16px;font-weight:700;margin:6px 0}.cmp-scheme .cmp-model{overflow-wrap:anywhere;font-size:18px;font-weight:650}.cmp-scheme .cmp-topology{font-variant-numeric:tabular-nums;margin:8px 0 12px}.cmp-state{font-size:12px;display:inline-block;padding:3px 8px;border:1px solid rgb(var(--c-border));border-radius:4px}.cmp-state[data-status="fail"]{color:rgb(var(--c-bad))}.cmp-state[data-status="pass"]{color:rgb(var(--c-ok))}.cmp-state[data-status="warn"]{color:rgb(var(--c-warn))}.cmp-metric{padding:16px 0;border-top:1px solid rgb(var(--c-border))}.cmp-metric h4{font-weight:600;margin-bottom:12px}.cmp-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.cmp-value{font-size:26px;font-weight:650;font-variant-numeric:tabular-nums;line-height:1.3;overflow-wrap:anywhere}.cmp-value small{font-size:14px;font-weight:400}.cmp-side-label{font-size:12px;color:rgb(var(--c-text-2))}.cmp-delta{font-size:14px;margin-top:8px;color:rgb(var(--c-text-2))}.cmp-details{border-top:1px solid rgb(var(--c-border));padding:16px 0}.cmp-details summary{cursor:pointer;font-weight:600;min-height:44px;display:list-item;align-content:center;margin-left:16px}.cmp-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:14px;margin-top:12px}.cmp-table th,.cmp-table td{padding:12px 8px;text-align:left;vertical-align:top;border-bottom:1px solid rgb(var(--c-border));overflow-wrap:anywhere}.cmp-table th{color:rgb(var(--c-text-2));font-weight:500}.cmp-table th:first-child{width:30%}.cmp-table tr> :not(:first-child){font-variant-numeric:tabular-nums}.cmp-notes{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px;padding-top:16px}.cmp-notes h4{font-weight:650;margin-bottom:8px}.cmp-footnote{font-size:12px;border-top:1px solid rgb(var(--c-border));padding-top:16px}
 @media(max-width:900px){.cmp-controls{grid-template-columns:repeat(2,minmax(0,1fr))}.cmp-controls>div:first-child{grid-column:1/-1}.cmp-controls button{grid-column:1/-1}}@media(max-width:540px){.cmp-panel{padding:16px}.cmp-heading{flex-direction:column}.cmp-heading h3{font-size:20px}.cmp-duty{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.cmp-schemes{grid-template-columns:1fr}.cmp-value{font-size:22px}.cmp-notes{grid-template-columns:1fr}.cmp-table{font-size:12px}.cmp-table th,.cmp-table td{padding:10px 4px}.cmp-table th:first-child{width:28%}}
 
+
+/* Dedicated workspaces: navigation first, focused content second. */
+[hidden]{display:none!important}
+.module-tabs{flex-wrap:wrap;max-width:100%}.module-tabs .mode-tab{min-height:44px;white-space:normal;justify-content:center}
+.module-tabs .active-comparison{color:rgb(var(--c-accent));background:rgb(var(--c-accent)/.13);box-shadow:inset 0 0 0 1px rgb(var(--c-accent)/.3)}
+.module-tabs .mode-tab:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:2px}
+.calculation-breakdown{grid-column:1/-1}.steps-summary{cursor:pointer;min-height:44px;list-style:none}.steps-summary::-webkit-details-marker{display:none}.steps-summary:focus-visible{outline:2px solid rgb(var(--c-accent));outline-offset:4px}.steps-chevron{transition:transform .15s}.calculation-breakdown[open] .steps-chevron{transform:rotate(180deg)}.calculation-breakdown[open] #calcStepsContent{margin-top:20px}
+.comparison-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:12px;margin-bottom:20px;padding:16px 20px;border:1px solid rgb(var(--c-border));border-radius:10px;background:rgb(var(--c-panel));font-size:14px}
+.comparison-toolbar>div{display:flex;align-items:center;gap:12px;min-width:0}.comparison-toolbar label{font-weight:600}.comparison-toolbar select{border:1px solid rgb(var(--c-border));background:rgb(var(--c-bg));color:rgb(var(--c-text));border-radius:6px;min-height:44px;padding:8px 12px;font:inherit;max-width:100%}.comparison-toolbar p{color:rgb(var(--c-text-2));flex:1 1 200px}.comparison-toolbar button{min-height:44px;padding:10px 16px}
+.cmp-setup{padding:20px;background:rgb(var(--c-elevated)/.6);border:1px solid rgb(var(--c-border)/.7);border-radius:8px;margin-bottom:20px}.cmp-setup h4{font-weight:650;margin-bottom:16px}.cmp-setup .cmp-control-note{margin-bottom:0}
+#cmpMetrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:0 0 24px}.cmp-metric{padding:20px;border:1px solid rgb(var(--c-border));border-radius:8px;background:rgb(var(--c-elevated)/.35);min-width:0}.cmp-metric h4{min-height:44px}.cmp-value{font-size:24px}.cmp-pair{gap:12px}.cmp-delta{font-size:13px;line-height:1.6}
+#cmpSchemeCards{margin-bottom:20px}.cmp-details{padding:12px 0}.cmp-panel{max-width:1400px;margin:auto}
+#exportModal.comparison-export #exportPreviewPaper{max-width:850px!important}.comparison-report table{table-layout:fixed}.comparison-report td,.comparison-report th{overflow-wrap:anywhere}
+@media(min-width:1280px){#calculatorModule{grid-template-columns:minmax(350px,.85fr) minmax(0,1.3fr);align-items:start}}
+@media(max-width:1100px){#cmpMetrics{grid-template-columns:1fr}.cmp-metric h4{min-height:0}.cmp-value{font-size:26px}}
+@media(max-width:640px){.module-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));width:100%}.module-tabs .mode-tab{padding:10px;font-size:13px}.workspace-navigation .recommend-wrap{width:100%}.comparison-toolbar{padding:16px;gap:12px}.comparison-toolbar>div{flex-direction:column;align-items:stretch;width:100%;gap:6px}.comparison-toolbar p{flex-basis:100%}.comparison-toolbar button{flex:1 1 120px}.cmp-setup{padding:16px}.cmp-heading .cmp-tag{display:none}.cmp-metric{padding:16px}.comparison-report{font-size:12px}}
+@media(prefers-reduced-motion:reduce){.steps-chevron{transition:none}}
+
+@media(max-width:767px){
+ #exportModal .export-modal-box{height:94dvh;max-height:none;width:96vw}
+ #exportModalBody{display:block!important;overflow-y:auto;overflow-x:hidden;min-width:0}
+ #exportControlPane,#exportPreviewPane{width:100%;min-width:0;overflow:visible;flex:none}
+ #exportControlPane>div:first-child>div:first-child{flex-wrap:wrap;gap:8px}
+ #exportControlPane>div:first-child>div:first-child>div:last-child{flex-wrap:wrap;gap:6px}
+ #exportControlPane>div:last-child{flex:none}
+ #exportParamsListContainer{flex:none;max-height:240px;min-height:100px;overflow:auto}
+ #exportPreviewPane>div:last-child{display:block;overflow:visible;padding:12px}
+ #exportPreviewPane{border-top:1px solid rgb(var(--c-border))}
+ #exportPreviewPaper{min-width:0}
+ #exportModalCloseBtn{flex-shrink:0;min-width:44px;min-height:44px}
+ #exportModalBadgeText{display:none}
+ #exportModalTitleText{font-size:14px;line-height:1.5}
+ #exportModal .export-modal-box>div:first-child{padding:12px;gap:8px}
+ #exportModal .export-modal-box>div:first-child>div{min-width:0}
+ #exportDownloadBtn,#exportPrintBtn{min-height:44px}
+}
 </style>
 </head>
 <body class="text-ink antialiased">
@@ -577,8 +613,8 @@
                 </div>
 
                 <!-- ── Mode Switcher ────────────────────────────────── -->
-                <div class="mb-5 flex flex-wrap items-center gap-3">
-                    <div class="flex gap-1 rounded-xl border border-line/50 bg-panel/30 p-1 shadow-sm backdrop-blur-sm">
+                <div class="workspace-navigation mb-5 flex flex-wrap items-center gap-3">
+                    <nav class="module-tabs flex gap-1 rounded-xl border border-line/50 bg-panel/30 p-1 shadow-sm backdrop-blur-sm" aria-label="工作模块">
                         <button type="button" id="tabPower"
                             class="mode-tab active-power rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2">
                             <span>⚡</span> 功率验证模式
@@ -591,7 +627,8 @@
                             class="mode-tab rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2">
                             <span>🔌</span> 直流UPS模式
                         </button>
-                    </div>
+                        <button type="button" id="tabComparison" class="mode-tab rounded-lg px-5 py-2 text-sm font-bold flex items-center gap-2" aria-controls="batteryComparisonSection"><span aria-hidden="true">⇄</span><span id="tabComparisonLabel">方案对比</span></button>
+                    </nav>
                     <div class="recommend-wrap">
                         <div id="modeRecommend" class="rounded-lg px-3 py-1.5 text-xs font-semibold cursor-help"></div>
                         <span class="tip" id="modeTooltip"></span>
@@ -599,10 +636,10 @@
                 </div>
 
                 <!-- ── Two-column grid ──────────────────────────────── -->
-                <div class="main-grid grid gap-6 lg:grid-cols-2">
+                <div id="calculatorModule" class="main-grid grid gap-6 lg:grid-cols-2">
 
                     <!-- LEFT COLUMN – Parameter Inputs -->
-                    <div class="space-y-5">
+                    <div class="space-y-5 calculator-inputs">
 
                         <!-- ── Core parameters ──────────────────────────── -->
                         <div class="card p-5">
@@ -970,17 +1007,7 @@
                             <pre id="configSummaryText" class="max-h-72 overflow-auto whitespace-pre-wrap rounded-lg border border-line/60 bg-elev/70 p-3 font-mono text-[11px] leading-relaxed text-ink2"></pre>
                         </div>
 
-                        <!-- ── Calculation Steps（左栏底部，紧随输入参数，便于对照）── -->
-                        <div class="card-deep p-5" id="calcStepsCard">
-                            <div class="mb-3 flex items-center justify-between gap-2">
-                                <div class="flex items-center gap-2">
-                                    <span id="stepsIcon" class="text-base">⚡</span>
-                                    <h3 class="text-sm font-bold text-ink" id="stepsTitle">计算步骤详解</h3>
-                                </div>
-                                <span class="text-[10px] text-ink3 font-mono font-medium">STEP-BY-STEP BREAKDOWN</span>
-                            </div>
-                            <div id="calcStepsContent" class="space-y-2 text-xs"></div>
-                        </div>
+
 
                     </div>
 
@@ -1389,20 +1416,40 @@
 
                     </div>
 
+
+                        <!-- ── Calculation Steps（左栏底部，紧随输入参数，便于对照）── -->
+                        <details class="card-deep p-5 calculation-breakdown" id="calcStepsCard">
+                            <summary class="steps-summary flex items-center justify-between gap-2">
+                                <span class="flex items-center gap-2">
+                                    <span id="stepsIcon" class="text-base">⚡</span>
+                                    <span class="text-sm font-bold text-ink" id="stepsTitle">计算步骤详解</span>
+                                </span>
+                                <span class="steps-chevron" aria-hidden="true">⌄</span>
+                            </summary>
+                            <div id="calcStepsContent" class="space-y-2 text-xs"></div>
+                        </details>
+                </div>
+
                     <!-- Same-duty comparison: engineering checks precede advantages. -->
-                    <section class="lg:col-span-2" id="batteryComparisonSection" aria-labelledby="cmpTitle">
+                    <section id="batteryComparisonSection" hidden aria-labelledby="cmpTitle">
+                      <div class="comparison-toolbar">
+                        <div><label for="cmpSourceMode" id="cmpSourceLabel">对比工况来源</label><select id="cmpSourceMode"><option value="power">功率验证</option><option value="capacity">能量验证</option><option value="dc">直流 UPS</option></select></div>
+                        <p id="cmpLinkedHint">与当前计算配置实时联动，无需重复输入。</p>
+                        <button type="button" class="btn btn-ghost" id="cmpEditConfigBtn">调整锌镍配置</button>
+                        <button type="button" class="btn btn-ok" id="cmpExportReportBtn"><i data-lucide="file-down" class="h-4 w-4"></i><span id="cmpExportReportLabel">导出对比报告</span></button>
+                      </div>
                       <div class="cmp-panel">
                         <header class="cmp-heading"><div><p class="cmp-eyebrow">Ni-Zn / VRLA</p><h3 id="cmpTitle">同工况电池方案对比</h3><p id="cmpSubtitle" class="cmp-muted">先校核可行性，再比较方案差异。</p></div><span class="cmp-tag" id="cmpScopeLabel">当前配置 vs 基准方案</span></header>
                         <div id="cmpDutySummary" class="cmp-duty"></div>
                         <div id="cmpValidity" class="cmp-validity" role="status" aria-live="polite"></div>
-                        <div class="cmp-controls">
+                        <div class="cmp-setup"><h4 id="cmpSetupTitle">铅酸基准设置</h4><div class="cmp-controls">
                           <div><label for="cmpLeadAcidModelSelect" id="cmpLblLaModel">铅酸基准型号</label><select id="cmpLeadAcidModelSelect"><option value="LHR12400W">Leoch LHR12400W · 12V 100Ah</option><option value="LHR12800W">Leoch LHR12800W · 12V 210Ah</option></select></div>
                           <div><label for="cmpLeadAcidEpvSelect" id="cmpLblLaEpv">请求截止电压</label><select id="cmpLeadAcidEpvSelect"><option value="1.85">1.85 V/cell</option><option value="1.80">1.80 V/cell</option><option value="1.75">1.75 V/cell</option><option value="1.70">1.70 V/cell</option><option value="1.67">1.67 V/cell</option><option value="1.60">1.60 V/cell</option></select></div>
                           <div><label for="cmpLaSeriesBlocks" id="cmpLblSeries">铅酸每串块数</label><input type="number" id="cmpLaSeriesBlocks" min="1" step="1"></div>
                           <div><label for="cmpLaParallelStrings" id="cmpLblParallel">铅酸并联串数</label><input type="number" id="cmpLaParallelStrings" min="1" step="1"></div>
                           <button type="button" id="cmpResetLaBtn">恢复自动基准</button>
                         </div>
-                        <p class="cmp-muted cmp-control-note" id="cmpAutoEpvNotice"></p>
+                        <p class="cmp-muted cmp-control-note" id="cmpAutoEpvNotice"></p></div>
                         <div id="cmpSchemeCards" class="cmp-schemes"></div>
                         <div id="cmpMetrics"></div>
                         <details class="cmp-details" id="cmpEngineeringDetails"><summary id="cmpEngineeringTitle">工程校核与数据明细</summary><div id="cmpEngineeringRows"></div></details>
@@ -1411,8 +1458,6 @@
                         <p class="cmp-footnote" id="cmpDataFootnote"></p>
                       </div>
                     </section>
-                </div>
-
             </div>
         </div>
     </main>
@@ -1611,8 +1656,8 @@
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-ink flex items-center gap-2">
-                        导出配置表格与方案预览
-                        <span class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">专业报表</span>
+                        <span id="exportModalTitleText">导出配置表格与方案预览</span>
+                        <span id="exportModalBadgeText" class="rounded-full bg-accent/15 px-2 py-0.5 text-[10px] font-medium text-accent">专业报表</span>
                     </h3>
                     <p class="text-[11px] text-ink3" id="exportModalSubtitleText">勾选导出参数 · 实时无需下载预览 · 样式一致的高保真 Excel / PDF 导出</p>
                 </div>
@@ -1623,9 +1668,9 @@
         </div>
 
         <!-- 弹窗主体（左右分栏） -->
-        <div class="grid grid-cols-1 md:grid-cols-12 flex-1 min-h-0 overflow-hidden">
+        <div id="exportModalBody" class="grid grid-cols-1 md:grid-cols-12 flex-1 min-h-0 overflow-hidden">
             <!-- 左栏：参数勾选与导出格式设置 -->
-            <div class="md:col-span-5 lg:col-span-5 border-r border-line/60 flex flex-col bg-elev/30 min-h-0">
+            <div id="exportControlPane" class="md:col-span-5 lg:col-span-5 border-r border-line/60 flex flex-col bg-elev/30 min-h-0">
                 <!-- 顶部快捷操作栏 -->
                 <div class="p-3.5 border-b border-line/60 space-y-2.5 bg-panel/50">
                     <div class="flex items-center justify-between">
@@ -1702,7 +1747,7 @@
                                 <input type="radio" name="exportFormatRadio" value="html" class="peer sr-only">
                                 <div class="peer-checked:border-accent peer-checked:bg-accent/15 absolute inset-0 rounded-xl border-2 border-transparent transition"></div>
                                 <i data-lucide="code" class="h-4.5 w-4.5 text-blue-500 mb-0.5 z-10"></i>
-                                <span class="text-xs font-bold text-ink z-10">HTML 网页</span>
+                                <span class="text-xs font-bold text-ink z-10">HTML</span>
                                 <span class="text-[10px] text-ink3 z-10 font-mono">.html</span>
                             </label>
                         </div>
@@ -1722,7 +1767,7 @@
             </div>
 
             <!-- 右栏：实时表格预览区（免下载即可看） -->
-            <div class="md:col-span-7 lg:col-span-7 flex flex-col bg-base2/60 min-h-0 overflow-hidden">
+            <div id="exportPreviewPane" class="md:col-span-7 lg:col-span-7 flex flex-col bg-base2/60 min-h-0 overflow-hidden">
                 <div class="px-4 py-2.5 border-b border-line/60 flex items-center justify-between bg-panel/40">
                     <div class="flex items-center gap-2">
                         <span class="inline-block h-2 w-2 rounded-full bg-emerald-500 animate-pulse"></span>
@@ -2669,6 +2714,8 @@ const BRIEF_EXPORT_PARAM_IDS = new Set([
 let exportModalState = {
     selectedIds: new Set(),
     allRows: [],
+    kind: 'configuration',
+    comparisonSnapshot: null,
     format: 'xlsx',
     exportLang: 'zh',
     filterText: '',
@@ -2680,7 +2727,96 @@ let exportModalState = {
     dc: null
 };
 
+// COMPARISON REPORT DATA — captured once per modal, localized without changing the live UI.
+function captureComparisonReport() {
+    if (!lastComparisonResult || !lastExportInputs || !(Number(document.getElementById('cellsPerString').value)>0)) return null;
+    return structuredClone({res:lastComparisonResult,inputs:lastExportInputs,mode:calcMode,
+        active:lastComparisonActive,
+        capturedAt:new Date().toISOString()});
+}
+function getComparisonExportDataset(targetLang) {
+    const snapshot=exportModalState.comparisonSnapshot;
+    if (!snapshot) return null;
+    const {res,inputs,mode,active,capturedAt}=snapshot, z=res.znNi,l=res.leadAcid;
+    const en=targetLang==='en',t=(zh,eng)=>en?eng:zh;
+    const state=x=>({pass:t('计算校核通过','Calculation checks passed'),warn:t('待核实','Review required'),fail:t('未通过','Not compliant')})[x]||'—';
+    const top=x=>`${x.seriesBlocks} ${t('块/串','blocks/string')} × ${x.parallelStrings} ${t('串并联','parallel strings')}`;
+    const num=(x,n=1)=>Number.isFinite(x)?fmt(x,n):'—';
+    const rows=[],add=(id,category,label,zn,la,options={})=>rows.push({id:'cmp_'+id,category,label,znValue:zn,laValue:la,value:la===undefined?String(zn):`Ni-Zn: ${zn} | VRLA: ${la}`,highlight:false,...options});
+    const conditions=t('统一工况','Shared duty'),schemes=t('方案与校核','Schemes & checks'),physical=t('物理量对比','Physical comparison'),engineering=t('工程明细','Engineering data'),bounds=t('资料与边界','Sources & limits');
+    add('system',conditions,t('系统 / 计算口径','System / calculation basis'),`${res.isDc?'DC UPS':'AC UPS'} · ${mode==='capacity'?t('能量验证','Energy validation'):mode==='dc'?t('恒流验证','Constant-current validation'):t('功率验证','Power validation')} · ${res.isDuty?t('阶梯负载','Duty cycle'):t('恒定负载','Constant load')}`,undefined,{brief:true});
+    const load=res.isDc?`${num(active?.adjustedContCurrentA)} A / ${num(active?.adjustedPeakCurrentA)} A ${t('持续 / 峰值','continuous / peak')}`:`${num(active?.totalRequiredPower/1000,2)} kW ${t('电池侧（含系数）','battery-side (factors included)')}`;
+    add('load',conditions,t('设计负载','Design load'),load,undefined,{brief:true});
+    add('duration',conditions,t('工况总时长','Duty duration'),`${num(res.durationMin)} min`,undefined,{brief:true});
+    add('bus',conditions,t('统一母线窗口','Shared bus window'),`${num(res.vMin)}–${num(res.vMax)} V`,undefined,{brief:true});
+    add('factors',conditions,t('老化 / 设计余量','Aging / design margin'),`${getFactorMultiplier(inputs.agingFactor).toFixed(3)}× / ${getFactorMultiplier(inputs.designMargin).toFixed(3)}×`,undefined,{brief:true});
+    add('temperature',conditions,t('环境温度','Ambient temperature'),`${num(inputs.temperature)} °C`,undefined,{brief:true});
+    add('model',schemes,t('型号','Model'),z.modelId,l.modelId,{highlight:true,brief:true});
+    add('topology',schemes,t('串并联配置','Topology'),top(z),top(l),{brief:true});
+    add('status',schemes,t('计算校核状态','Calculation status'),state(z.status),state(l.status),{required:true,highlight:true,brief:true});
+    add('satisfaction',schemes,t('负载 / 工况满足率','Load / duty satisfaction'),`${num(z.satisfactionPct)}%`,`${num(l.satisfactionPct)}%`,{highlight:true,brief:true});
+    add('voltage',schemes,t('电压窗口','Voltage window'),z.voltageOk?t('通过','Pass'):t('未通过','Fail'),l.voltageOk?t('通过','Pass'):t('未通过','Fail'),{brief:true});
+    const issueText={weightSource:t('内置重量字段冲突，须核对规格书','Conflicting embedded weight fields; verify datasheet'),topology:t('串并联或节数不一致','Inconsistent topology or cell count'),voltage:t('充放电电压不在系统窗口内','Charge/discharge voltage outside system window'),load:t('负载满足率不足100%','Load satisfaction below 100%'),current:t('放电电流超过上限','Discharge current exceeds limit'),lookup:t('EPV或时长查表越界，须单独校核','Cutoff or duration outside table range; separate verification required'),data:t('缺少有效计算结果或数据','Missing valid calculation results or data')};
+    add('issues',schemes,t('校核问题','Check issues'),z.issues.map(k=>issueText[k]||k).join('; ')||t('无已识别问题','None identified'),l.issues.map(k=>issueText[k]||k).join('; ')||t('无已识别问题','None identified'),{required:true,brief:true});
+    add('weight',physical,t('电池本体总重量','Total battery-only weight'),`${num(z.totalWeight)} kg`,`${num(l.totalWeight)} kg`,{highlight:true,brief:true});
+    add('volume',physical,t('电池本体总体积','Total battery-only volume'),`${num(z.totalVolume)} L`,`${num(l.totalVolume)} L`,{highlight:true,brief:true});
+    add('blocks',physical,t('总块数（配置规模）','Total blocks (scale only)'),String(z.totalBlocks),String(l.totalBlocks),{brief:true});
+    const difference=(a,b,unit)=>res.comparable&&Number.isFinite(a)&&Number.isFinite(b)&&b>0?`${t('Ni-Zn − VRLA','Ni-Zn − VRLA')}: ${num(a-b)} ${unit}; ${num((a-b)/b*100)}% ${t('以铅酸为基准','relative to VRLA')}`:t('待双方校核通过后再给出差异结论','Difference conclusions paused until both schemes pass');
+    add('weight_delta',physical,t('重量差异','Weight difference'),difference(z.totalWeight,l.totalWeight,'kg'),undefined,{brief:true});
+    add('volume_delta',physical,t('体积差异','Volume difference'),difference(z.totalVolume,l.totalVolume,'L'),undefined,{brief:true});
+    add('unit_rating',engineering,t('单块额定参数','Per-block nominal rating'),z.model.specs.label,l.model.specs.label);
+    add('unit_weight',engineering,t('单块重量','Per-block weight'),`${num(z.unitWeight,2)} kg`,`${num(l.unitWeight,2)} kg`);
+    add('alternate_weight',engineering,t('备用重量字段（待核实）','Alternate weight field (unverified)'),`${num(z.model.specs.officialWeightKg,2)} kg`,'—');
+    const dims=x=>[x.model.specs.lengthM,x.model.specs.widthM,x.model.specs.heightM].map(v=>num(v*1000,0)).join(' × ')+' mm';
+    add('dimensions',engineering,t('单块尺寸','Per-block dimensions'),dims(z),dims(l));
+    add('unit_volume',engineering,t('单块本体体积','Per-block body volume'),`${num(z.unitVolume,2)} L`,`${num(l.unitVolume,2)} L`);
+    for(const [id,zh,eng,key] of [['nominal','标称总电压','Nominal string voltage','nominalVolt'],['cutoff','截止总电压','Cutoff string voltage','cutoffVolt'],['float','浮充总电压','Float string voltage','floatVolt'],['equalize','均充总电压','Equalize string voltage','equalizeVolt']])add(id,engineering,t(zh,eng),`${num(z[key])} V`,`${num(l[key])} V`);
+    add('epv',engineering,t('有效截止档位','Effective cutoff row'),`${z.effectiveEpv??'—'} V/cell`,`${l.effectiveEpvKey} V/cell`);
+    add('lookup',engineering,t('查表时长 / 单位能力','Lookup duration / unit capability'),`${num(z.lookupTime)} min / ${num(z.lookupValue,2)} ${res.isDc?'A':'W/cell'}`,`${num(l.lookupTime)} min / ${num(l.lookupValue,2)} ${res.isDc?'A/string':'W/cell'}`);
+    const section=x=>x.controlSection?`${t('断面','Section')} ${x.controlSection.section} · ${num(x.controlSection.sectionMinutes)} min`:'—';
+    add('section',engineering,t('控制断面','Controlling section'),section(z),section(l));
+    if(res.isDuty){const steps=res.isDc?(active?.dutyDetails||[]):(inputs.dutySteps||[]);steps.forEach((st,i)=>add('stage_'+i,t('统一负载阶段','Shared duty stages'),`${t('阶段','Stage')} ${i+1}`,`${res.isDc?num(st.currentA,2)+' A '+t('原始负载；另乘统一系数','raw load; shared factors applied separately'):num(st.load/1000,2)+' kW '+t('电池侧含系数','battery-side with factors')} / ${num(st.durationMin)} min`));}
+    add('source',bounds,t('资料来源状态','Source status'),t('项目内置数据；规格书版本、单位及试验温度待复核','Embedded project data; verify datasheet revision, units and test temperature'),undefined,{required:true,brief:true});
+    add('scope',bounds,t('比较范围','Comparison scope'),t('电池本体及本工具计算校核，非最终工程认证。未计算实际柜架占地、柜数、报价或TCO；自动基准不代表全局最优。','Battery bodies and this tool’s calculations, not final engineering certification. Installed footprint, cabinet counts, quotations and TCO are not calculated. The automatic benchmark is not claimed globally optimal.'),undefined,{required:true,brief:true});
+    add('temperature_scope',bounds,t('温度适用边界','Temperature limitations'),t('温度仅用于锌镍充电电压补偿，未修正放电能力；铅酸充电使用内置标称值，需项目复核温补。','Temperature compensates Ni-Zn charging voltage only, not discharge capability. VRLA charging uses embedded nominal values; verify project temperature compensation.'),undefined,{required:true});
+    return {title:t('锌镍与铅酸电池同工况对比报告','Ni-Zn / VRLA Same-duty Comparison Report'),subTitle:`${z.modelId} vs ${l.modelId} · ${capturedAt}`,upsLabel:`${res.isDc?'DC UPS':'AC UPS'} · ${num(res.durationMin)} min`,rows,inputs,r:active,dc:res.isDc?active:null};
+}
+function comparisonReportDisclaimer(lang) {
+    return lang==='en'?'Calculation snapshot, not engineering certification. Verify source revisions, units, test temperature and project charging limits. Status, issues and source limitations remain in every export.':'本报告为计算快照，非工程认证。请复核资料版本、单位、试验温度及项目充电边界；所有导出均保留校核状态、问题和资料限制。';
+}
+function renderComparisonExportPreview(selectedRows,lang) {
+    const en=lang==='en',esc=escapeHtml,t=(zh,eng)=>en?eng:zh;
+    const style='border:1px solid #d0d7de;padding:10px 12px;text-align:left;vertical-align:top;white-space:pre-wrap;';
+    const header=['', 'Ni-Zn','VRLA'];header[0]=t('对比项目','Comparison item');
+    const table=selectedRows.map(row=>`<tr><th scope="row" style="${style}background:#f8fafc;width:32%;font-weight:600;">${esc(row.label)}</th>${row.laValue===undefined?`<td colspan="2" style="${style}">${esc(String(row.znValue))}</td>`:`<td style="${style}${row.highlight?'background:#eff6ff;font-weight:650;':''}">${esc(String(row.znValue))}</td><td style="${style}${row.highlight?'background:#eff6ff;font-weight:650;':''}">${esc(String(row.laValue))}</td>`}</tr>`).join('');
+    document.getElementById('exportPreviewPaper').innerHTML=`<article class="comparison-report" style="font-family:Arial,'Microsoft YaHei',sans-serif;font-size:12px;color:#0f172a;background:#fff;line-height:1.6;"><header style="padding:22px;background:#1d4ed8;color:#fff;"><h2 style="font-size:19px;font-weight:700;margin:0 0 8px;">${esc(exportModalState.title)}</h2><p style="font-size:11px;margin:0;overflow-wrap:anywhere;">${esc(exportModalState.subTitle)}</p></header><div style="padding:12px 16px;background:#f8fafc;border-bottom:1px solid #d0d7de;">${esc(exportModalState.upsLabel)} · ${esc(t('同一工况 / 同一系数 / 同一电压窗口','Same duty / same factors / same voltage window'))}</div><table style="width:100%;border-collapse:collapse;table-layout:fixed;"><thead><tr>${header.map(h=>`<th style="${style}background:#1d4ed8;color:#fff;width:${h===header[0]?'32':'34'}%;">${esc(h)}</th>`).join('')}</tr></thead><tbody>${table}</tbody></table><footer style="padding:16px;background:#f8fafc;font-size:11px;color:#475569;">${esc(comparisonReportDisclaimer(lang))}</footer></article>`;
+}
+async function exportComparisonToExcel(title,subTitle,selectedRows,filename,lang) {
+    const en=lang==='en',name=en?'Battery Comparison':'电池方案对比',head=[en?'Comparison item':'对比项目','Ni-Zn','VRLA'];
+    if(window.ExcelJS){
+        const wb=new window.ExcelJS.Workbook();wb.creator='Battery Configuration';wb.created=new Date();
+        const ws=wb.addWorksheet(name,{views:[{state:'frozen',ySplit:3}],pageSetup:{paperSize:9,orientation:'portrait',fitToPage:true,fitToWidth:1,fitToHeight:0}});
+        ws.columns=[{width:34},{width:40},{width:40}];
+        ws.mergeCells('A1:C1');ws.getCell('A1').value=title;ws.getRow(1).height=38;
+        ws.mergeCells('A2:C2');ws.getCell('A2').value=subTitle;ws.getRow(2).height=36;
+        head.forEach((h,i)=>ws.getCell(3,i+1).value=h);ws.getRow(3).height=28;
+        selectedRows.forEach((r,i)=>{const n=i+4;ws.getCell(n,1).value=r.label;ws.getCell(n,2).value=String(r.znValue);if(r.laValue===undefined)ws.mergeCells(n,2,n,3);else ws.getCell(n,3).value=String(r.laValue);
+            const units=text=>[...String(text)].reduce((n,ch)=>n+(/[\u4e00-\u9fff]/.test(ch)?2:1),0);const longest=Math.max(units(r.label)/30,units(r.znValue)/(r.laValue===undefined?72:34),units(r.laValue??'')/34);ws.getRow(n).height=Math.max(26,Math.ceil(longest)*14+10);
+            if(r.highlight)for(let c=2;c<=3;c++)ws.getCell(n,c).fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFEFF6FF'}};
+        });
+        const n=selectedRows.length+4;ws.mergeCells(n,1,n,3);ws.getCell(n,1).value=comparisonReportDisclaimer(lang);ws.getRow(n).height=45;
+        ws.eachRow((row,r)=>row.eachCell({includeEmpty:true},(cell,c)=>{cell.font={name:'Arial',size:r===1?14:r<=3?11:10,bold:r===1||r===3||c===1||Boolean(selectedRows[r-4]?.highlight),color:{argb:r===1||r===3?'FFFFFFFF':'FF0F172A'}};cell.alignment={vertical:'middle',horizontal:'left',wrapText:true};cell.border={top:{style:'thin',color:{argb:'FFD0D7DE'}},bottom:{style:'thin',color:{argb:'FFD0D7DE'}},left:{style:'thin',color:{argb:'FFD0D7DE'}},right:{style:'thin',color:{argb:'FFD0D7DE'}}};if(r===1||r===3)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FF1D4ED8'}};else if(c===1||r===2)cell.fill={type:'pattern',pattern:'solid',fgColor:{argb:'FFF8FAFC'}};}));
+        ws.pageSetup.printTitlesRow='1:3';ws.pageSetup.printArea=`A1:C${n}`;
+        triggerBlobDownload(new Blob([await wb.xlsx.writeBuffer()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}),filename);
+    }else if(window.XLSX){
+        const data=[[title,'',''],[subTitle,'',''],head,...selectedRows.map(r=>[r.label,String(r.znValue),r.laValue===undefined?'':String(r.laValue)]),[comparisonReportDisclaimer(lang),'','']];
+        const wb=window.XLSX.utils.book_new(),ws=window.XLSX.utils.aoa_to_sheet(data);ws['!cols']=[{wch:34},{wch:40},{wch:40}];ws['!merges']=[{s:{r:0,c:0},e:{r:0,c:2}},{s:{r:1,c:0},e:{r:1,c:2}},{s:{r:data.length-1,c:0},e:{r:data.length-1,c:2}},...selectedRows.flatMap((r,i)=>r.laValue===undefined?[{s:{r:i+3,c:1},e:{r:i+3,c:2}}]:[])];window.XLSX.utils.book_append_sheet(wb,ws,name);window.XLSX.writeFile(wb,filename);
+    }else throw new Error(en?'Excel export library not loaded':'未加载Excel导出组件');
+}
+// END COMPARISON REPORT DATA
+
 function getExportDataset(targetLang) {
+    if (exportModalState.kind === 'comparison') return getComparisonExportDataset(targetLang);
     if (!lastExportInputs || (!lastExportResult && !lastExportDc)) return null;
     const inputs = lastExportInputs;
     const r = lastExportResult;
@@ -2783,9 +2919,10 @@ function updateExportModalStaticTexts(lang) {
     const isEn = lang === 'en';
     const setT = (id, text) => { const el = document.getElementById(id); if (el) el.textContent = text; };
 
-    setT('exportModalTitleText', isEn ? 'Export Configuration Table & Proposal Preview' : '导出配置表格与方案预览');
+    setT('exportModalTitleText', exportModalState.kind === 'comparison' ? (isEn ? 'Export Comparison Report' : '导出电池对比报告') : (isEn ? 'Export Configuration Table & Proposal Preview' : '导出配置表格与方案预览'));
+    document.querySelector('#exportModal [role=dialog]').setAttribute('aria-label', exportModalState.kind === 'comparison' ? (isEn ? 'Export comparison report' : '导出对比报告') : (isEn ? 'Export configuration report' : '导出配置报告'));
     setT('exportModalBadgeText', isEn ? 'Professional Report' : '专业报表');
-    setT('exportModalSubtitleText', isEn ? 'Select parameters · Real-time preview · Matching Excel / PDF export' : '勾选导出参数 · 实时无需下载预览 · 样式一致的高保真 Excel / PDF 导出');
+    setT('exportModalSubtitleText', exportModalState.kind === 'comparison' ? (isEn ? 'Live preview · Checks, issues and source limitations are always retained' : '实时预览 · 校核状态、问题及资料限制始终保留') : (isEn ? 'Select parameters · Real-time preview · Excel / PDF / HTML' : '勾选导出参数 · 实时预览 · Excel / PDF / HTML'));
 
     setT('exportParamCheckTitle', isEn ? 'Parameters Selection' : '参数勾选');
     setT('exportSelectAllBtn', isEn ? 'Select All' : '全选');
@@ -2799,11 +2936,12 @@ function updateExportModalStaticTexts(lang) {
 
     setT('exportLangLabelText', isEn ? 'Export Table Language' : '导出表格语言');
     setT('exportLangSubText', isEn ? 'Syncs live preview & exported files' : '实时联动预览与导出文件');
-    setT('exportLangZhText', isEn ? '🇨🇳 Chinese (中文)' : '🇨🇳 中文报表');
-    setT('exportLangEnText', isEn ? '🇺🇸 English (英文)' : '🇺🇸 英文报表');
+    setT('exportLangZhText', isEn ? '🇨🇳 Chinese' : '🇨🇳 中文报表');
+    setT('exportLangEnText', isEn ? '🇺🇸 English' : '🇺🇸 英文报表');
 
     setT('exportFormatLabel', isEn ? 'Export File Format' : '导出文件格式');
-    setT('exportFormatHint', isEn ? 'Strictly matching formatting across Excel and PDF' : 'Excel 与 PDF 样式与排版严格一致');
+    setT('exportFormatHint', isEn ? 'Same selected data in Excel, PDF and HTML' : 'Excel、PDF、HTML 使用同一组已选数据');
+    document.getElementById('exportBriefBtn').title = isEn ? 'Select core items; comparison warnings are always retained' : '选择核心项目；对比校核警示始终保留';
     setT('exportPrintBtnText', isEn ? 'Print' : '打印');
     setT('exportPreviewHeaderTitle', isEn ? 'Real-time Preview (Live View)' : '实时导出预览 (无需下载直接查看)');
 
@@ -2815,7 +2953,10 @@ function updateExportModalStaticTexts(lang) {
     }
 }
 
-function openExportModal() {
+function openExportModal(kind = 'configuration') {
+    exportModalState.kind = kind === 'comparison' ? 'comparison' : 'configuration';
+    exportModalState.comparisonSnapshot = exportModalState.kind === 'comparison' ? captureComparisonReport() : null;
+    document.getElementById('exportModal').classList.toggle('comparison-export',exportModalState.kind === 'comparison');
     exportModalState.exportLang = (typeof currentLang !== 'undefined' ? currentLang : 'zh');
     const radios = document.querySelectorAll('input[name="exportLangRadio"]');
     radios.forEach(r => {
@@ -2855,7 +2996,11 @@ function closeExportModal() {
     if (modal) modal.style.display = 'none';
 }
 
+function getSelectedExportRows() {
+    return exportModalState.allRows.filter(r => exportModalState.selectedIds.has(r.id) || (exportModalState.kind === 'comparison' && r.required));
+}
 function renderExportChecklist() {
+    if (exportModalState.kind === 'comparison') exportModalState.allRows.filter(r=>r.required).forEach(r=>exportModalState.selectedIds.add(r.id));
     const container = document.getElementById('exportParamsListContainer');
     const badge = document.getElementById('exportSelectedCountBadge');
     if (!container) return;
@@ -2915,7 +3060,7 @@ function renderExportChecklist() {
             const isChecked = exportModalState.selectedIds.has(row.id);
             html += `<label class="export-checklist-item" data-id="${row.id}">
                 <div class="flex items-center gap-2 min-w-0">
-                    <input type="checkbox" class="export-param-check h-3.5 w-3.5 accent-blue-600 rounded cursor-pointer" data-id="${row.id}" ${isChecked ? 'checked' : ''}>
+                    <input type="checkbox" class="export-param-check h-3.5 w-3.5 accent-blue-600 rounded cursor-pointer" data-id="${row.id}" ${isChecked ? 'checked' : ''} ${row.required ? 'disabled' : ''}>
                     <span class="text-xs truncate ${row.highlight ? 'font-bold text-ink' : 'text-ink2'}">${row.label}</span>
                     ${row.highlight ? `<span class="rounded bg-amber-500/15 px-1 py-0.2 text-[9px] font-bold text-amber-500">${isEn ? 'Key' : '重点'}</span>` : ''}
                 </div>
@@ -2962,7 +3107,7 @@ function renderExportPreview() {
     const lang = exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
     const isEn = (lang === 'en');
 
-    const selectedRows = exportModalState.allRows.filter(r => exportModalState.selectedIds.has(r.id));
+    const selectedRows = getSelectedExportRows();
     if (rowCountEl) {
         rowCountEl.textContent = `${selectedRows.length} ${isEn ? 'Items' : '项参数'}`;
     }
@@ -2978,6 +3123,8 @@ function renderExportPreview() {
         lucide.createIcons();
         return;
     }
+
+    if (exportModalState.kind === 'comparison') { renderComparisonExportPreview(selectedRows,lang); return; }
 
     const now = new Date();
     const dateStr = now.getFullYear() + '-' + String(now.getMonth()+1).padStart(2,'0') + '-' + String(now.getDate()).padStart(2,'0');
@@ -3032,7 +3179,7 @@ async function downloadExportFile() {
     const lang = exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
     const isEn = (lang === 'en');
 
-    const selectedRows = exportModalState.allRows.filter(r => exportModalState.selectedIds.has(r.id));
+    const selectedRows = getSelectedExportRows();
     if (selectedRows.length === 0) {
         alert(isEn ? 'Please select at least one parameter before exporting!' : '请至少勾选一个参数后再导出！');
         return;
@@ -3040,7 +3187,7 @@ async function downloadExportFile() {
 
     const ts = new Date().toISOString().slice(0,10);
     const modelId = exportModalState.inputs ? exportModalState.inputs.batteryModelId : 'Battery';
-    const baseName = (isEn ? `Battery_Configuration_${modelId}_${ts}` : `电池配置方案_${modelId}_${ts}`);
+    const baseName = exportModalState.kind === 'comparison' ? (isEn ? `Battery_Comparison_${modelId}_${ts}` : `电池对比报告_${modelId}_${ts}`) : (isEn ? `Battery_Configuration_${modelId}_${ts}` : `电池配置方案_${modelId}_${ts}`);
 
     const downloadBtn = document.getElementById('exportDownloadBtn');
     const oldText = downloadBtn ? downloadBtn.innerHTML : '';
@@ -3070,6 +3217,7 @@ async function downloadExportFile() {
 }
 
 async function exportToExcel(title, subTitle, selectedRows, filename, targetLang) {
+    if (exportModalState.kind === 'comparison') return exportComparisonToExcel(title,subTitle,selectedRows,filename,targetLang);
     const lang = targetLang || exportModalState.exportLang || (typeof currentLang !== 'undefined' ? currentLang : 'zh');
     const isEn = (lang === 'en');
     const sheetName = isEn ? 'Battery Configuration' : '电池配置方案';
@@ -3184,7 +3332,39 @@ async function exportToExcel(title, subTitle, selectedRows, filename, targetLang
     }
 }
 
+async function exportComparisonToPdf(previewEl,filename) {
+    if (!window.html2canvas || !window.jspdf) { printExportTable(); return; }
+    const source=previewEl.querySelector('.comparison-report');
+    if(!source)throw new Error('Comparison preview is missing');
+    const host=document.createElement('div');host.style.cssText='position:absolute;left:-20000px;top:0;width:794px;background:white;pointer-events:none;';document.body.appendChild(host);
+    try {
+        const maxHeight=794*273/186-32,pages=[];
+        let current,body;
+        const makePage=()=>{
+            current=document.createElement('article');current.style.cssText=source.style.cssText+'width:794px;box-sizing:border-box;';host.appendChild(current);
+            current.appendChild(source.querySelector('header').cloneNode(true));
+            if(!pages.length)current.appendChild(source.querySelector('header').nextElementSibling.cloneNode(true));
+            const table=source.querySelector('table').cloneNode(false);table.style.tableLayout='fixed';table.appendChild(source.querySelector('thead').cloneNode(true));body=document.createElement('tbody');table.appendChild(body);current.appendChild(table);pages.push(current);
+        };
+        makePage();
+        for(const row of source.querySelectorAll('tbody tr')){
+            const clone=row.cloneNode(true);body.appendChild(clone);
+            if(current.offsetHeight>maxHeight&&body.children.length>1){body.removeChild(clone);makePage();body.appendChild(clone);}
+        }
+        const footer=source.querySelector('footer').cloneNode(true);current.appendChild(footer);
+        if(current.offsetHeight>maxHeight){current.removeChild(footer);makePage();current.appendChild(footer);}
+        const pdf=new window.jspdf.jsPDF({orientation:'portrait',unit:'mm',format:'a4'});
+        for(let i=0;i<pages.length;i++){
+            const page=pages[i],number=document.createElement('p');number.style.cssText='margin:0;padding:10px 16px;font-size:11px;color:#64748b;text-align:right;background:#fff;';number.textContent=`${i+1} / ${pages.length}`;page.appendChild(number);
+            const canvas=await window.html2canvas(page,{scale:2,useCORS:true,backgroundColor:'#ffffff',logging:false});
+            if(i)pdf.addPage();pdf.addImage(canvas.toDataURL('image/jpeg',.98),'JPEG',12,12,186,canvas.height*186/canvas.width);
+        }
+        pdf.save(filename);
+    } finally {host.remove();}
+}
+
 async function exportToPdf(previewEl, filename) {
+    if(exportModalState.kind === 'comparison') return exportComparisonToPdf(previewEl,filename);
     if (!previewEl) throw new Error((typeof currentLang !== 'undefined' && currentLang === 'en') ? 'Preview content not found' : '未找到预览内容');
 
     if (window.html2canvas && window.jspdf) {
@@ -3298,7 +3478,7 @@ function printExportTable() {
 }
 
 // 导出模态框事件监听绑定
-document.getElementById('exportTableBtn').addEventListener('click', openExportModal);
+document.getElementById('exportTableBtn').addEventListener('click', () => openExportModal('configuration'));
 document.getElementById('exportModalCloseBtn').addEventListener('click', closeExportModal);
 document.getElementById('exportModal').addEventListener('click', (e) => {
     if (e.target.id === 'exportModal') closeExportModal();
@@ -3317,7 +3497,7 @@ document.getElementById('exportSelectAllBtn').addEventListener('click', () => {
 });
 
 document.getElementById('exportBriefBtn').addEventListener('click', () => {
-    exportModalState.selectedIds = new Set(exportModalState.allRows.filter(r => BRIEF_EXPORT_PARAM_IDS.has(r.id)).map(r => r.id));
+    exportModalState.selectedIds = new Set(exportModalState.allRows.filter(r => exportModalState.kind === 'comparison' ? r.brief || r.required : BRIEF_EXPORT_PARAM_IDS.has(r.id)).map(r => r.id));
     renderExportChecklist();
     renderExportPreview();
 });
@@ -5105,8 +5285,12 @@ function dcStep(lbl,title,formula,result) {
 // MODE CONTROLLER
 // ══════════════════════════════════════════════════════════════════
 let calcMode = 'power'; // 'power' | 'capacity' | 'dc'
+let activeWorkspace = 'calculator';
 
 function setCalcMode(mode) {
+    if (!['power','capacity','dc'].includes(mode)) return;
+    document.getElementById('calcStepsCard').open = false;
+    activeWorkspace = 'calculator';
     calcMode = mode;
     const isPower = mode === 'power';
     const isCap   = mode === 'capacity';
@@ -5147,7 +5331,37 @@ function setCalcMode(mode) {
 
     recalculate();
     if (isDc && typeof updateDcBlocksRecommendation === 'function') updateDcBlocksRecommendation();
+    refreshWorkspaceNavigation();
 }
+
+function refreshWorkspaceNavigation() {
+    const comparing = activeWorkspace === 'comparison';
+    const t = cmpText;
+    document.getElementById('calculatorModule').hidden = comparing;
+    document.getElementById('batteryComparisonSection').hidden = !comparing;
+    document.querySelector('.workspace-navigation .recommend-wrap').hidden = comparing;
+    ['tabPower','tabCapacity','tabDcUps'].forEach((id,i)=>{
+        const el=document.getElementById(id),on=!comparing&&calcMode===['power','capacity','dc'][i];
+        el.classList.toggle(['active-power','active-capacity','active-dc'][i],on);
+        el.setAttribute('aria-current',on?'page':'false');
+    });
+    const tab=document.getElementById('tabComparison');
+    tab.classList.toggle('active-comparison',comparing);tab.setAttribute('aria-current',comparing?'page':'false');
+    const labels={tabComparisonLabel:t('方案对比','Comparison'),cmpSourceLabel:t('对比工况来源','Source calculation'),cmpLinkedHint:t('与所选模块的配置实时联动，无需重复输入。','Linked to the selected calculator. No duplicate input needed.'),cmpEditConfigBtn:t('调整锌镍配置','Edit Ni-Zn configuration'),cmpExportReportLabel:t('导出对比报告','Export comparison report'),cmpSetupTitle:t('铅酸基准设置','VRLA benchmark settings')};
+    Object.entries(labels).forEach(([id,text])=>document.getElementById(id).textContent=text);
+    const source=document.getElementById('cmpSourceMode');source.value=calcMode;
+    [...source.options].forEach((o,i)=>o.textContent=[t('功率验证','Power validation'),t('能量验证','Energy validation'),t('直流 UPS','DC UPS')][i]);
+    document.querySelector('.module-tabs').setAttribute('aria-label',t('工作模块','Work modules'));
+}
+function openComparisonModule() {
+    activeWorkspace='comparison';refreshWorkspaceNavigation();
+    document.getElementById('calcStepsCard').open=false;
+    document.querySelector('#calcPane .scroll-root').scrollTop=0;
+}
+document.getElementById('tabComparison').addEventListener('click',openComparisonModule);
+document.getElementById('cmpSourceMode').addEventListener('change',e=>{setCalcMode(e.target.value);openComparisonModule();});
+document.getElementById('cmpEditConfigBtn').addEventListener('click',()=>{setCalcMode(calcMode);document.querySelector('#calcPane .scroll-root').scrollTop=0;document.getElementById('batteryModel').focus({preventScroll:true});});
+document.getElementById('cmpExportReportBtn').addEventListener('click',()=>openExportModal('comparison'));
 
 document.getElementById('tabPower').addEventListener('click', () => setCalcMode('power'));
 document.getElementById('tabCapacity').addEventListener('click', () => setCalcMode('capacity'));
@@ -5404,6 +5618,7 @@ let cmpLeadAcidEpv = 1.67;
 let cmpManualSeriesBlocks = null;
 let cmpManualParallelStrings = null;
 let lastComparisonResult = null;
+let lastComparisonActive = null;
 
 function getLeadAcidDefaultModelId(znNiModelId) {
     return znNiModelId === '8XNFZ38' ? 'LHR12400W' : 'LHR12800W';
@@ -5742,6 +5957,7 @@ function updateComparisonSection(inputs, r, capResult, dcResult) {
         manualSeriesBlocks: cmpManualSeriesBlocks, manualParallelStrings: cmpManualParallelStrings
     });
     lastComparisonResult = res;
+    lastComparisonActive = active;
     const t = cmpText, esc = escapeHtml;
     const put = (id,text) => { const el=document.getElementById(id); if(el) el.textContent=text; };
     const html = (id,text) => { const el=document.getElementById(id); if(el) el.innerHTML=text; };
@@ -6337,6 +6553,11 @@ function applyLanguage(lang) {
     setText('aiSystemTip', isEn ? 'AI gives concise recommendations by default. Ask for calculation steps when needed; supported replies can be applied to the calculator.' : 'AI 优先精简回复推荐方案（追问步骤时才展开计算过程）· 回复末尾支持一键填入');
     if (typeof refreshRulesPanel === 'function') refreshRulesPanel();
     if (typeof renderSavedConfigs === 'function') renderSavedConfigs();
+    refreshWorkspaceNavigation();
+    if (document.getElementById('exportModal').style.display !== 'none') {
+        const data=getExportDataset(currentLang);
+        if(data){Object.assign(exportModalState,{title:data.title,subTitle:data.subTitle,upsLabel:data.upsLabel,allRows:data.rows});renderExportChecklist();renderExportPreview();}
+    }
     // Re-render calculation and views
     if (typeof updateModeRecommend === 'function') updateModeRecommend();
     if (typeof recalculate === 'function') recalculate();
