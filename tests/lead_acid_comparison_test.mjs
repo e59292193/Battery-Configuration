@@ -206,29 +206,12 @@ console.log(`  ✓ 母线下限 110.4V 约束下成功自动匹配至: ${cmpResD
 // 6. UI DOM 节点与中英文 I18N 词条存在性验证
 // ────────────────────────────────────────────────────────────────
 console.log('\n6. DOM 结构与国际化双语词条核查:');
-const requiredIds = [
-    'batteryComparisonSection', 'cmpTitle', 'cmpLeadAcidModelSelect', 'cmpLeadAcidEpvSelect',
-    'cmpLaSeriesBlocks', 'cmpLaParallelStrings', 'cmpResetLaBtn', 'cmpZnNiPairName', 'cmpLaPairName',
-    'cmpZnTotalBlocks', 'cmpBlockSavingBadge', 'cmpZnTopologyDesc', 'cmpZnTotalWeight',
-    'cmpWeightSavingBadge', 'cmpZnTotalVol', 'cmpVolSavingBadge', 'cmpZnSatisfaction',
-    'cmpLaTotalBlocks', 'cmpLaTopologyDesc', 'cmpLaTotalWeight', 'cmpLaTotalVol', 'cmpLaSatisfaction',
-    'cmpGridTitle', 'cmpV1Title', 'cmpV2Title', 'cmpV3Title', 'cmpV4Title'
-];
-requiredIds.forEach(id => {
-    assert.ok(html.includes(`id="${id}"`), `DOM 必须包含 #${id}`);
-});
-console.log(`  ✓ 页面 DOM 结构完整包含所有 ${requiredIds.length} 个核心交互与展示组件`);
-
-const i18nKeys = [
-    'cmp_title', 'cmp_subtitle', 'cmp_lbl_la_model', 'cmp_lbl_la_epv',
-    'cmp_zn_card_title', 'cmp_la_card_title', 'cmp_lbl_zn_blocks',
-    'cmp_lbl_zn_weight', 'cmp_lbl_zn_vol', 'cmp_v1_title', 'cmp_v2_title',
-    'cmp_v3_title', 'cmp_v4_title'
-];
-i18nKeys.forEach(k => {
-    assert.ok(html.includes(`${k}:`), `I18N 必须包含词条 ${k}`);
-});
-console.log('  ✓ 中英双语 I18N 词条全部定义完整并与主题切换联动');
+const requiredIds = ['batteryComparisonSection','cmpTitle','cmpLeadAcidModelSelect','cmpLeadAcidEpvSelect','cmpLaSeriesBlocks','cmpLaParallelStrings','cmpResetLaBtn','cmpValidity','cmpDutySummary','cmpSchemeCards','cmpMetrics','cmpEngineeringDetails','cmpEngineeringRows','cmpDutyRows','cmpTechnicalNotes'];
+requiredIds.forEach(id=>assert.ok(html.includes(`id="${id}"`),`Missing #${id}`));
+assert.ok(html.includes('Same-duty battery comparison'));
+assert.ok(html.includes('同工况电池方案对比'));
+assert.ok(!html.includes('15年设计寿命免换新'));
+console.log('  ✓ V1 comparison DOM and bilingual renderer verified');
 
 console.log('═'.repeat(72));
 console.log('铅酸方案对比模块所有断言校验全部通过！100% 满足需求。');
